@@ -38,7 +38,20 @@ app.post('/analyze', async (req, res) => {
         {
           role: "user",
           content: [
-            { type: "text", text: "Analyze this textbook page in its original language. Please:\n\n1. Extract and clean the text content, maintaining the original language\n2. Create 5-7 flashcards from key concepts in the original language. Format as FRONT: [question] BACK: [answer]\n3. Generate 10 multiple choice questions in the original language. Format as: Q: [question] A) [correct answer] B-D) [plausible wrong answers] CORRECT: [letter]\n\nReturn the response in JSON format: {'text': 'cleaned text content', 'flashcards': [{'front': '...', 'back': '...'}], 'quiz': [{'question': '...', 'options': [...], 'correct': 'A'}]}" },
+            {
+              type: "text",
+              text: "Analyze this textbook page in its original language. Please:\n\n" +
+                    "1. Generate a concise, descriptive title (2-4 words) that captures the main topic\n" +
+                    "2. Extract and clean the text content, maintaining the original language\n" +
+                    "3. Create 5-7 flashcards from key concepts in the original language. Format as FRONT: [question] BACK: [answer]\n" +
+                    "4. Generate 10 multiple choice questions in the original language. Format as: Q: [question] A) [correct answer] B-D) [plausible wrong answers] CORRECT: [letter]\n\n" +
+                    "Return the response in JSON format: {\n" +
+                    "  'title': 'generated title',\n" +
+                    "  'text_content': 'cleaned text content',\n" +
+                    "  'flashcards': [{'front': '...', 'back': '...'}],\n" +
+                    "  'quiz': [{'question': '...', 'options': [...], 'correct': 'A'}]\n" +
+                    "}"
+            },
             {
               type: "image_url",
               image_url: {
