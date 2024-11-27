@@ -40,17 +40,32 @@ app.post('/analyze', async (req, res) => {
           content: [
             {
               type: "text",
-              text: "Analyze this textbook page in its original language. Please:\n\n" +
-                    "1. Generate a concise, descriptive title (2-4 words) that captures the main topic\n" +
-                    "2. Extract and clean the text content, maintaining the original language\n" +
-                    "3. Create 5-7 flashcards from key concepts in the original language. Format as FRONT: [question] BACK: [answer]\n" +
-                    "4. Generate 10 multiple choice questions in the original language. Format as: Q: [question] A) [correct answer] B-D) [plausible wrong answers] CORRECT: [letter]\n\n" +
-                    "Return the response in JSON format: {\n" +
-                    "  'title': 'generated title',\n" +
-                    "  'text_content': 'cleaned text content',\n" +
-                    "  'flashcards': [{'front': '...', 'back': '...'}],\n" +
-                    "  'quiz': [{'question': '...', 'options': [...], 'correct': 'A'}]\n" +
-                    "}"
+              text: `Olet suomalainen opettaja, joka luo oppimateriaalia. Analysoi tämä oppikirjan sivu ja:
+
+1. Luo ytimekäs otsikko (2-4 sanaa), joka kuvaa aihetta.
+
+2. Kopioi tekstisisältö tarkasti, säilytä alkuperäinen muotoilu ja oikeinkirjoitus.
+
+3. Luo 5-7 kääntökorttia tärkeimmistä käsitteistä:
+   - Etupuoli: Selkeä kysymys, joka testaa ymmärrystä
+   - Takapuoli: Täsmällinen, lyhyt vastaus
+   - Vältä suoria lainauksia tekstistä
+   - Keskity keskeisiin oppimistavoitteisiin
+   - Tarkista oikeinkirjoitus huolellisesti
+
+4. Luo 5-10 monivalintakysymystä:
+   - Kysymykset mittaavat ymmärrystä, ei ulkoa opettelua
+   - Oikea vastaus (A) on yksiselitteinen
+   - Väärät vastaukset (B-D) ovat uskottavia mutta selkeästi vääriä
+   - Käytä täsmällistä kieltä ja tarkista oikeinkirjoitus
+
+Palauta vastaus JSON-muodossa:
+{
+  'title': 'otsikko',
+  'text_content': 'tekstisisältö',
+  'flashcards': [{'front': 'kysymys', 'back': 'vastaus'}],
+  'quiz': [{'question': 'kysymys', 'options': ['A', 'B', 'C', 'D'], 'correct': 'A'}]
+}`
             },
             {
               type: "image_url",
@@ -62,7 +77,8 @@ app.post('/analyze', async (req, res) => {
           ]
         }
       ],
-      max_tokens: 4096
+      max_tokens: 4096,
+      temperature: 0.7
     });
 
     console.log('OpenAI Response:', JSON.stringify(response, null, 2));
