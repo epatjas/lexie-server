@@ -40,29 +40,102 @@ app.post('/analyze', async (req, res) => {
           content: [
             {
               type: "text",
-              text: `Olet suomalainen opettaja, joka luo oppimateriaalia. Analysoi tämä oppikirjan sivu ja:
+              text: `You are an expert Finnish educator with years of experience in creating educational materials for Finnish students. Your task is to analyze this textbook page and create high-quality study materials in Finnish.
 
-1. Luo ytimekäs otsikko (2-4 sanaa), joka kuvaa aihetta.
+System Instructions:
+1. First, carefully analyze the entire content and identify:
+   - The subject area and topic
+   - The grade/difficulty level
+   - Key learning objectives
+   - Important concepts and their relationships
 
-2. Kopioi tekstisisältö tarkasti, säilytä alkuperäinen muotoilu ja oikeinkirjoitus.
+2. Then generate the following materials in Finnish, ensuring perfect Finnish grammar and natural language use:
 
-3. Luo 5-7 kääntökorttia tärkeimmistä käsitteistä:
-   - Etupuoli: Selkeä kysymys, joka testaa ymmärrystä
-   - Takapuoli: Täsmällinen, lyhyt vastaus
-   - Vältä suoria lainauksia tekstistä
-   - Keskity keskeisiin oppimistavoitteisiin
-   - Tarkista oikeinkirjoitus huolellisesti
+Content Requirements:
 
-4. Luo 5-10 monivalintakysymystä:
-   - Kysymykset mittaavat ymmärrystä, ei ulkoa opettelua
-   - Oikea vastaus (A) on yksiselitteinen
-   - Väärät vastaukset (B-D) ovat uskottavia mutta selkeästi vääriä
-   - Käytä täsmällistä kieltä ja tarkista oikeinkirjoitus
+A. Title:
+   - Create a concise 2-4 word title in Finnish
+   - Must accurately reflect the main topic
+   - Use grade-appropriate language
 
-Palauta vastaus JSON-muodossa:
+B. Text Content:
+   - Convert the content into properly formatted markdown
+   - Preserve the original text hierarchy and structure
+   - Use appropriate markdown syntax:
+     * # for main headings
+     * ## for subheadings
+     * - or * for bullet points
+     * 1. for numbered lists
+     * > for important quotes or definitions
+     * **bold** for key terms
+     * *italic* for emphasis
+   - Maintain paragraph spacing with blank lines
+   - Preserve all special characters and diacritical marks
+   - Structure content into logical sections
+
+C. Flashcards:
+   Generate 5-7 flashcards where:
+   - Front: Create conceptual questions that test understanding
+   - Back: Provide clear, concise answers
+   - Use proper Finnish educational terminology
+   - Ensure natural Finnish sentence structure
+   - Include at least one application/example card
+   - Avoid direct quotes from the text
+   - Focus on core learning objectives
+
+D. Quiz:
+   Create 5-10 multiple choice questions where:
+   - Questions test comprehension, not memorization
+   - Correct answer must be unambiguously correct
+   - Distractors must be:
+     * Plausible but clearly incorrect
+     * Written in proper Finnish
+     * Similar in length and style to the correct answer
+   - Include at least one application question
+
+Quality Requirements:
+- Use perfect Finnish grammar and punctuation
+- Maintain consistent pedagogical level throughout
+- Ensure all content is culturally appropriate for Finnish education
+- Use age-appropriate vocabulary and examples
+- Follow Finnish educational standards
+
+Return the response in exactly this JSON format:
 {
   'title': 'otsikko',
-  'text_content': 'tekstisisältö',
+  'text_content': {
+    'raw_text': 'Complete markdown-formatted text content',
+    'sections': [
+      {
+        'type': 'heading',
+        'level': 1,
+        'content': 'Main heading text'
+      },
+      {
+        'type': 'paragraph',
+        'content': 'Paragraph text'
+      },
+      {
+        'type': 'list',
+        'style': 'bullet',
+        'items': ['item 1', 'item 2']
+      },
+      {
+        'type': 'list',
+        'style': 'numbered',
+        'items': ['item 1', 'item 2']
+      },
+      {
+        'type': 'quote',
+        'content': 'Quote text'
+      },
+      {
+        'type': 'definition',
+        'term': 'term',
+        'definition': 'definition text'
+      }
+    ]
+  },
   'flashcards': [{'front': 'kysymys', 'back': 'vastaus'}],
   'quiz': [{'question': 'kysymys', 'options': ['A', 'B', 'C', 'D'], 'correct': 'A'}]
 }`
