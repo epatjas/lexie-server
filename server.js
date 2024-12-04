@@ -30,6 +30,92 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 })
 
+// Define the prompt once at the top level
+const systemPrompt = `TASK 1: EXACT TRANSCRIPTION
+Provide an exact, word-for-word transcription of all Finnish text content from these textbook pages.
+
+Include EXACTLY as written:
+- All main text and paragraphs
+- All section headings
+- All bullet points
+- All numbered lists
+- All highlighted boxes/summaries
+
+Do NOT include:
+- Page numbers
+- Image captions
+- Labels within illustrations
+- Any text appearing in diagrams/pictures
+
+Maintain:
+- Original Finnish spelling and punctuation
+- All paragraph breaks
+- All formatting (bold, lists, etc.)
+- Reading order of the content
+
+TASK 2: STUDY MATERIALS
+Using the exact transcribed content, generate:
+
+1. FLASHCARDS (5-10 pairs):
+Format:
+FRONT: [Key term or concept in Finnish]
+BACK: [Definition or explanation in Finnish]
+
+Requirements:
+- Focus on essential concepts from the text
+- Use clear, simple language
+- Keep explanations concise and memorable
+- Use only information explicitly stated in the text
+
+2. QUIZ QUESTIONS (5-10):
+Format:
+Q: [Question in Finnish]
+A) [Option]
+B) [Option]
+C) [Option]
+D) [Option]
+Correct: [Letter]
+
+Requirements:
+- Test comprehension of key concepts
+- Use age-appropriate language
+- Base all answers directly on the text content
+- Ensure all correct answers are clearly supported by the text
+
+Note: All generated content must be based solely on the information provided in the transcribed text, with no external information added.
+
+PROVIDE THE OUTPUT IN THIS JSON FORMAT:
+{
+  "title": "string",
+  "language": "fi",
+  "text_content": {
+    "raw_text": "markdown formatted text",
+    "sections": [
+      {
+        "type": "heading | paragraph | list | quote",
+        "level": 1,
+        "content": "string",
+        "style": "bullet | numbered",
+        "items": ["string"]
+      }
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "string",
+      "back": "string"
+    }
+  ],
+  "quiz": [
+    {
+      "question": "string",
+      "options": ["string"],
+      "correct": "string",
+      "explanation": "string"
+    }
+  ]
+}`;
+
 // Test endpoint
 app.get('/', (req, res) => {
   res.json({ message: 'Lexie server is running!' })
@@ -50,100 +136,7 @@ app.post('/analyze', async (req, res) => {
     const combinedContent = [
       {
         type: "text",
-        text: `# System Context
-You are an expert OCR system and educational content creator. Your TWO primary tasks are:
-1. Extract text with perfect accuracy from ALL provided images
-2. Create high-quality study materials from the complete extracted content
-
-# Output Format
-{
-  "title": "string",
-  "language": "string",
-  "text_content": {
-    "raw_text": "string",
-    "sections": [
-      {
-        "type": "string",
-        "level": "number",
-        "content": "string",
-        "style": "string",
-        "items": ["string"]
-      }
-    ]
-  },
-  "flashcards": [
-    {
-      "front": "string",
-      "back": "string"
-    }
-  ],
-  "quiz": [
-    {
-      "question": "string",
-      "options": ["string"],
-      "correct": "string",
-      "explanation": "string"
-    }
-  ]
-}
-
-# Task 1: Text Extraction
-CRITICAL: Extract text perfectly from ALL provided images.
-- Process each image with equal attention to detail
-- Combine content logically when multiple images are provided
-- Copy text EXACTLY as written - no modifications whatsoever
-- Double-check every word for accuracy
-- If unsure about any text, mark it with [unclear] 
-- Preserve ALL special characters and diacritical marks
-- Keep ALL formatting and structure exactly as in the original
-
-Follow these steps for EACH image:
-1. First pass: Extract all text character by character
-2. Second pass: Compare against original image
-3. Third pass: Verify all special characters and diacritical marks
-4. Format using simple markdown:
-   - # for headings
-   - ** for bold
-   - * for italic
-   - - for bullet points
-   - 1. for numbered lists
-
-When handling multiple images:
-- Process each image fully before moving to the next
-- Maintain the logical flow of content
-- Combine content seamlessly in the final output
-
-# Task 2: Study Material Creation
-ONLY after perfect text extraction from ALL images, create:
-
-1. Flashcards (5-7)
-- Cover key concepts from all provided content
-- Use exact phrases from text
-- Make questions clear and specific
-- Ensure coverage across all important topics
-
-2. Quiz (5-10 questions)
-- Multiple choice format
-- Test understanding across all provided content
-- Use exact wording from text
-- Make distractors plausible but clearly incorrect
-- Include questions from all major topics covered
-
-# Quality Checks
-Before submitting:
-1. Verify text matches ALL images 100%
-2. Confirm all special characters are preserved
-3. Check formatting is consistent
-4. Ensure questions use exact text phrasing
-5. Verify all content is included and properly combined
-6. Verify all JSON is valid
-
-# Final Notes
-- Perfect text extraction is your TOP priority
-- Never modify or "improve" the original text
-- Use exact quotes in study materials
-- When in doubt, be more literal
-- Treat single and multiple images with equal attention to detail`
+        text: systemPrompt
       },
       ...images.map((image) => ({
         type: "image_url",
@@ -154,118 +147,19 @@ Before submitting:
       }))
     ];
 
-    // Create the messages array with the improved prompt
+    // Create the messages array - simplified to avoid duplicate prompt
     const messages = [
       {
         role: "user",
-        content: [
-          {
-            type: "text",
-            text: `# System Context
-You are an expert OCR system and educational content creator. Your TWO primary tasks are:
-1. Extract text with perfect accuracy from ALL provided images
-2. Create high-quality study materials from the complete extracted content
-
-# Output Format
-{
-  "title": "string",
-  "language": "string",
-  "text_content": {
-    "raw_text": "string",
-    "sections": [
-      {
-        "type": "string",
-        "level": "number",
-        "content": "string",
-        "style": "string",
-        "items": ["string"]
-      }
-    ]
-  },
-  "flashcards": [
-    {
-      "front": "string",
-      "back": "string"
-    }
-  ],
-  "quiz": [
-    {
-      "question": "string",
-      "options": ["string"],
-      "correct": "string",
-      "explanation": "string"
-    }
-  ]
-}
-
-# Task 1: Text Extraction
-CRITICAL: Extract text perfectly from ALL provided images.
-- Process each image with equal attention to detail
-- Combine content logically when multiple images are provided
-- Copy text EXACTLY as written - no modifications whatsoever
-- Double-check every word for accuracy
-- If unsure about any text, mark it with [unclear] 
-- Preserve ALL special characters and diacritical marks
-- Keep ALL formatting and structure exactly as in the original
-
-Follow these steps for EACH image:
-1. First pass: Extract all text character by character
-2. Second pass: Compare against original image
-3. Third pass: Verify all special characters and diacritical marks
-4. Format using simple markdown:
-   - # for headings
-   - ** for bold
-   - * for italic
-   - - for bullet points
-   - 1. for numbered lists
-
-When handling multiple images:
-- Process each image fully before moving to the next
-- Maintain the logical flow of content
-- Combine content seamlessly in the final output
-
-# Task 2: Study Material Creation
-ONLY after perfect text extraction from ALL images, create:
-
-1. Flashcards (5-7)
-- Cover key concepts from all provided content
-- Use exact phrases from text
-- Make questions clear and specific
-- Ensure coverage across all important topics
-
-2. Quiz (5-10 questions)
-- Multiple choice format
-- Test understanding across all provided content
-- Use exact wording from text
-- Make distractors plausible but clearly incorrect
-- Include questions from all major topics covered
-
-# Quality Checks
-Before submitting:
-1. Verify text matches ALL images 100%
-2. Confirm all special characters are preserved
-3. Check formatting is consistent
-4. Ensure questions use exact text phrasing
-5. Verify all content is included and properly combined
-6. Verify all JSON is valid
-
-# Final Notes
-- Perfect text extraction is your TOP priority
-- Never modify or "improve" the original text
-- Use exact quotes in study materials
-- When in doubt, be more literal
-- Treat single and multiple images with equal attention to detail`
-          },
-          ...combinedContent
-        ]
+        content: combinedContent  // systemPrompt is already included in combinedContent
       }
     ];
 
     console.log('Sending request to OpenAI...');
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: messages,
-      max_tokens: 4096,
+      max_tokens: 4096 * 2,
       temperature: 0.7
     });
 
