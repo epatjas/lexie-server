@@ -2,7 +2,6 @@ const express = require('express')
 const cors = require('cors')
 const OpenAI = require('openai')
 require('dotenv').config()
-const sdk = require('microsoft-cognitiveservices-speech-sdk');
 const fs = require('fs');
 
 const app = express()
