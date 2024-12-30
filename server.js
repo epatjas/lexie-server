@@ -1,282 +1,215 @@
-const express = require('express')
-const cors = require('cors')
-const OpenAI = require('openai')
-require('dotenv').config()
-const fs = require('fs');
+// Import required dependencies
+const express = require('express')                // Web framework for Node.js
+const cors = require('cors')                      // Enable Cross-Origin Resource Sharing
+const OpenAI = require('openai')                  // OpenAI API client
+const rateLimit = require('express-rate-limit')   // Rate limiting middleware
+require('dotenv').config()                        // Load environment variables from .env file
+const fs = require('fs');                         // File system module (currently unused - can be removed)
+const transcriptionPrompt = require('./prompts/transcriptionPrompt');    // Load prompts from separate files
+const studyMaterialsPrompt = require('./prompts/studyMaterialsPrompt');
 
+// Initialize Express app and middleware
 const app = express()
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
-}))
-app.use(express.json({
-  limit: '50mb',
-  verify: (req, res, buf) => {
-    try {
-      JSON.parse(buf);
-    } catch(e) {
-      res.status(400).send('Invalid JSON');
-    }
-  }
-}))
+app.use(cors())  // Enable CORS for all routes
 
-const PORT = 3000;
-const HOST = '0.0.0.0'; 
+// Configure Express to handle large payloads (needed for base64 images)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Initialize OpenAI client
+// Configure rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+})
+app.use(limiter)
+
+// Server configuration
+const PORT = process.env.PORT || 3000;    // Use PORT from env or default to 3000
+const HOST = '0.0.0.0';                   // Listen on all network interfaces
+const REQUEST_TIMEOUT = 120000           // 2 minute timeout for requests
+
+// Initialize OpenAI with API key from environment variables
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 })
 
-// Define the prompt once at the top level
-const systemPrompt = `TASK 1: EXACT TRANSCRIPTION
-Provide an exact, word-for-word transcription of all Finnish text content from these textbook pages.
+// Request validation middleware
+const validateAnalyzeRequest = (req, res, next) => {
+  const { images } = req.body
+  
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({ 
+      error: 'Invalid request',
+      details: 'Request must include an array of base64 encoded images'
+    })
+  }
 
-Include EXACTLY as written:
-- All main text and paragraphs
-- All section headings
-- All bullet points
-- All numbered lists
-- All highlighted boxes/summaries
+  // Log image sizes
+  images.forEach((img, index) => {
+    const sizeInBytes = Buffer.byteLength(img, 'base64');
+    const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
+    console.log(`[${new Date().toISOString()}] Image ${index + 1} size: ${sizeInMB}MB`)
+  })
 
-Do NOT include:
-- Page numbers
-- Image captions
-- Labels within illustrations
-- Any text appearing in diagrams/pictures
+  // Validate each image is a base64 string
+  const invalidImages = images.filter(img => typeof img !== 'string' || !img.length)
+  if (invalidImages.length > 0) {
+    return res.status(400).json({
+      error: 'Invalid image format',
+      details: 'All images must be base64 encoded strings'
+    })
+  }
 
-Maintain:
-- Original Finnish spelling and punctuation
-- All paragraph breaks
-- All formatting (bold, lists, etc.)
-- Reading order of the content
+  next()
+}
 
-TASK 2: STUDY MATERIALS
-Using the exact transcribed content, generate:
-
-1. FLASHCARDS (5-10 pairs):
-Format:
-FRONT: [Key term or concept in Finnish]
-BACK: [Definition or explanation in Finnish]
-
-Requirements:
-- Focus on essential concepts from the text
-- Use clear, simple language
-- Keep explanations concise and memorable
-- Use only information explicitly stated in the text
-
-2. QUIZ QUESTIONS (5-10):
-Format:
-Q: [Question in Finnish]
-A) [Option]
-B) [Option]
-C) [Option]
-D) [Option]
-Correct: [Letter]
-
-Requirements:
-- Test comprehension of key concepts
-- Use age-appropriate language
-- Base all answers directly on the text content
-- Ensure all correct answers are clearly supported by the text
-
-Note: All generated content must be based solely on the information provided in the transcribed text, with no external information added.
-
-PROVIDE THE OUTPUT IN THIS JSON FORMAT:
-{
-  "title": "string",
-  "language": "fi",
-  "text_content": {
-    "raw_text": "markdown formatted text",
-    "sections": [
-      {
-        "type": "heading | paragraph | list | quote",
-        "level": 1,
-        "content": "string",
-        "style": "bullet | numbered",
-        "items": ["string"]
-      }
-    ]
-  },
-  "flashcards": [
-    {
-      "front": "string",
-      "back": "string"
-    }
-  ],
-  "quiz": [
-    {
-      "question": "string",
-      "options": ["string"],
-      "correct": "string",
-      "explanation": "string"
-    }
-  ]
-}`;
-
-// Test endpoint
+// Basic test endpoint
 app.get('/', (req, res) => {
   res.json({ message: 'Lexie server is running!' })
 })
 
-app.post('/analyze', async (req, res) => {
+// Main endpoint for analyzing images and generating study materials
+app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
+  const startTime = Date.now();
+  
   try {
-    const { images } = req.body;
+    const { images } = req.body
+    console.log(`[${new Date().toISOString()}] Starting analysis of ${images.length} images`)
     
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      console.error('No images received');
-      return res.status(400).json({ error: 'No images provided' });
-    }
-
-    console.log(`Received analyze request for ${images.length} images`);
-
-    // Combine all images into one context
-    const combinedContent = [
-      {
-        type: "text",
-        text: systemPrompt
-      },
-      ...images.map((image) => ({
-        type: "image_url",
-        image_url: {
-          url: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`,
-          detail: "high"
-        }
-      }))
-    ];
-
-    // Create the messages array - simplified to avoid duplicate prompt
-    const messages = [
-      {
-        role: "user",
-        content: combinedContent  // systemPrompt is already included in combinedContent
-      }
-    ];
-
-    console.log('Sending request to OpenAI...');
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: messages,
-      max_tokens: 4096 * 2,
-      temperature: 0.7
-    });
-
-    // Add error handling for response validation
-    if (!response.choices || !response.choices[0] || !response.choices[0].message || !response.choices[0].message.content) {
-      throw new Error('Invalid response structure from OpenAI');
-    }
-
-    // Extract the message content from the OpenAI response
-    const messageContent = response.choices[0].message.content;
-    console.log('Raw OpenAI response content:', messageContent);
-
-    let parsedContent;
-    try {
-      // Extract JSON from the response if it's wrapped in markdown code blocks
-      const jsonMatch = messageContent.match(/```json\n([\s\S]*?)\n```/) || messageContent.match(/{[\s\S]*}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON content found in OpenAI response');
-      }
-
-      const jsonString = jsonMatch[1] || jsonMatch[0];
-      console.log('Extracted JSON string:', jsonString);
-      
-      parsedContent = JSON.parse(jsonString);
-
-      // Ensure the response has the required structure
-      if (!parsedContent.title || !parsedContent.text_content) {
-        throw new Error('Invalid response structure from OpenAI');
-      }
-
-      // Ensure text_content has the correct structure
-      if (typeof parsedContent.text_content === 'string') {
-        parsedContent.text_content = {
-          raw_text: parsedContent.text_content,
-          sections: [{
-            type: 'paragraph',
-            content: parsedContent.text_content
+    // Process images in parallel
+    const transcriptionPromises = images.map((image, index) => {
+      console.log(`[${new Date().toISOString()}] Processing image ${index + 1}/${images.length}`)
+      return openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{
+          role: "user",
+          content: [{
+            type: "text",
+            text: transcriptionPrompt
+          }, {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${image}`,
+              detail: "high"
+            }
           }]
-        };
-      }
+        }],
+        max_tokens: 4096,
+      })
+    })
 
-      // Ensure arrays exist and have correct structure
-      parsedContent.flashcards = (parsedContent.flashcards || []).map(card => ({
-        front: card.front || '',
-        back: card.back || ''
-      }));
-
-      parsedContent.quiz = (parsedContent.quiz || []).map(q => ({
-        question: q.question || '',
-        options: Array.isArray(q.options) ? q.options : [],
-        correct: q.correct || ''
-      }));
-
-      console.log('Final parsed content:', parsedContent);
-      res.json(parsedContent);
-      
-    } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      console.error('Parse error details:', parseError.message);
-      res.status(500).json({ 
-        error: 'Failed to parse analysis results',
-        details: parseError.message
-      });
-    }
+    // Wait for all transcriptions
+    console.log(`[${new Date().toISOString()}] Waiting for all transcriptions...`)
+    const transcriptionResponses = await Promise.all(transcriptionPromises)
     
+    // Combine transcriptions and keep the title from the first one
+    const transcriptions = transcriptionResponses.map(resp => 
+      JSON.parse(resp.choices[0].message.content)
+    )
+    const combinedTranscription = {
+      title: transcriptions[0].title,
+      text_content: {
+        raw_text: transcriptions.map(t => t.text_content.raw_text).join('\n\n'),
+        sections: transcriptions.flatMap(t => t.text_content.sections)
+      }
+    }
+
+    // Generate study materials from combined text
+    console.log(`[${new Date().toISOString()}] Generating study materials...`)
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{
+        role: "user",
+        content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
+      }],
+      max_tokens: 4096,
+      stream: true
+    })
+
+    let studyMaterialsResponse = ''
+    for await (const chunk of stream) {
+      studyMaterialsResponse += chunk.choices[0]?.delta?.content || ''
+    }
+
+    // Parse study materials
+    console.log(`[${new Date().toISOString()}] Parsing study materials response`)
+    const cleanStudyMaterialsResponse = studyMaterialsResponse
+      .replace(/```json\n/, '')
+      .replace(/\n```$/, '')
+
+    let studyMaterials
+    try {
+      studyMaterials = JSON.parse(cleanStudyMaterialsResponse)
+      console.log(`[${new Date().toISOString()}] Successfully parsed study materials`)
+    } catch (parseError) {
+      console.error(`[${new Date().toISOString()}] Failed to parse study materials:`, cleanStudyMaterialsResponse)
+      throw parseError
+    }
+
+    // Combine results
+    const result = {
+      title: combinedTranscription.title,
+      text_content: combinedTranscription.text_content,
+      flashcards: studyMaterials.flashcards,
+      quiz: studyMaterials.quiz,
+      created_at: Date.now(),
+      updated_at: Date.now()
+    }
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[${new Date().toISOString()}] Analysis completed in ${totalTime}ms`)
+    console.log('- Image sizes:', images.map((_, i) => `Image ${i + 1}: ${(Buffer.byteLength(images[i], 'base64') / (1024 * 1024)).toFixed(2)}MB`).join(', '))
+    console.log('- Parallel transcription time:', transcriptionResponses[0].created * 1000 - startTime, 'ms')
+    console.log('- Study materials time:', studyMaterialsResponse.created * 1000 - transcriptionResponses[0].created * 1000, 'ms')
+
+    res.json(result)
+
   } catch (error) {
-    console.error('Server Error:', error);
-    res.status(500).json({ 
-      error: 'Failed to process image',
-      details: error.message
+    console.error(`[${new Date().toISOString()}] Error:`, error);
+    
+    let statusCode = 500;
+    let errorMessage = 'Kuvien käsittelyssä tapahtui virhe';
+    
+    if (error.message.includes('Invalid request')) {
+      statusCode = 400;
+      errorMessage = 'Virheellinen pyyntö';
+    } else if (error.message.includes('too large')) {
+      statusCode = 413;
+      errorMessage = 'Kuvat ovat liian suuria';
+    } else if (error.message.includes('rate limit')) {
+      statusCode = 429;
+      errorMessage = 'Liian monta yritystä';
+    } else if (error.message.includes('OpenAI')) {
+      statusCode = 503;
+      errorMessage = 'Tekstintunnistus ei ole juuri nyt käytettävissä';
+    }
+
+    res.status(statusCode).json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-});
+})
 
-app.post('/text-to-speech', async (req, res) => {
-  try {
-    const { text } = req.body;
-    
-    const speechConfig = sdk.SpeechConfig.fromSubscription(
-      process.env.AZURE_SPEECH_KEY, 
-      process.env.AZURE_SPEECH_REGION
-    );
-    
-    // Set Finnish language and voice
-    speechConfig.speechSynthesisLanguage = "fi-FI";
-    speechConfig.speechSynthesisVoiceName = "fi-FI-SelmaNeural";
-
-    const audioConfig = sdk.AudioConfig.fromAudioFileOutput("output.mp3");
-    const synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
-
-    synthesizer.speakTextAsync(
-      text,
-      result => {
-        if (result) {
-          const audioFile = fs.readFileSync("output.mp3");
-          res.writeHead(200, {
-            'Content-Type': 'audio/mpeg',
-            'Content-Length': audioFile.length
-          });
-          res.end(audioFile);
-          synthesizer.close();
-        }
-      },
-      error => {
-        console.log(error);
-        synthesizer.close();
-        res.status(500).send(error);
-      });
-  } catch (error) {
-    res.status(500).send(error);
-  }
-});
-
+// Health check endpoint
 app.get('/ping', (req, res) => {
-  res.json({ message: 'Server is running' });
+  res.json({ message: 'Server is running' })
+})
+
+app.get('/processing-status/:id', (req, res) => {
+  const { id } = req.params;
+  // Get status from processing map/cache
+  const status = processingStatus.get(id) || { stage: 'unknown' };
+  res.json(status);
 });
 
+// Update status during processing
+const updateProcessingStatus = (id, stage) => {
+  processingStatus.set(id, { stage, timestamp: Date.now() });
+};
+
+// Start the server
 app.listen(PORT, HOST, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`For mobile access use: http://<your-local-ip>:${PORT}`);
-});
+  console.log(`Server running on http://localhost:${PORT}`)
+  console.log(`For mobile access use: http://<your-local-ip>:${PORT}`)
+})
