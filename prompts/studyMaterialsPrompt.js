@@ -1,57 +1,97 @@
 module.exports = `STUDY MATERIALS GENERATION TASK:
 
-Create study materials from the transcribed text. Use the same language as the source text.
+Create study materials directly from the text content. Use the original language of the text.
 
 1. QUIZ QUESTIONS (5):
-- Create clear questions that:
-  • Use exact quotes from the text when possible
-  • Test understanding of main points
-  • Have clear, unambiguous answers
-  • All content must come from the text
-  • Questions and answers in same language as text
+Create clear questions that test understanding of main concepts:
 
-- Each question must have:
-  • One correct answer (direct quote from text)
-  • Three incorrect options (also from text)
-  • All options must be actual phrases from the text
-  • All options should be related to the topic
-  • No made-up or modified content
-  • No translations to other languages
+QUESTION TYPES:
+• Definition questions (e.g., "Mitä tarkoittaa...")
+• Example questions (e.g., "Missä...")
+• Understanding questions (e.g., "Miksi...")
+• Process questions (e.g., "Miten...")
 
-2. FLASHCARDS (8):
-- Front: Clear question about a key concept
-- Back: Direct quote from the text as answer
-- Keep everything in the source text's language
-- Keep language natural and grammatically correct
+ANSWER OPTIONS REQUIREMENTS:
+• Correct answer:
+  - Must be based on information directly from the text
+  - Must be grammatically correct and complete
+  - Must clearly and accurately answer the question
+  - Can combine or adapt text content for grammar
+
+• Incorrect options must be:
+  - About the same concept or topic
+  - Same level of detail as correct answer
+  - Grammatically match the question format
+  - Plausible but clearly incorrect
+  - Written in the same style as the correct answer
+
+ANSWER OPTIONS QUALITY:
+• All options should:
+  - Be complete, grammatical sentences
+  - Be similar in length and style
+  - Use terminology from the text
+  - Follow proper grammar rules
+  - Make logical sense
+  - Flow naturally with the question
+
+AVOID IN OPTIONS:
+• Grammatically awkward adaptations
+• Unnatural combinations of text
+• Content from unrelated topics
+• Obviously wrong statements
+• Answers that contradict facts
+• Word-for-word quotes that don't fit grammatically
+
+2. FLASHCARDS (5):
+Different from quiz questions - focus on recall and key terms:
+
+FRONT SIDE:
+• Key term or concept from text
+• Fill-in-the-blank statement
+• Complete the definition
+• Identify the purpose
+• State the function
+
+BACK SIDE:
+• Brief, direct quote containing the answer
+• Key definition from text
+• Main function or purpose
+• Essential characteristic
+• No more than 2-3 sentences
 
 Return JSON response:
 {
   "flashcards": [
     {
-      "front": "question in source language",
-      "back": "answer from source text"
+      "front": "Key term or fill-in-blank",
+      "back": "Short, precise quote with answer"
     }
   ],
   "quiz": [
     {
-      "question": "question in source language",
+      "question": "Clear concept question",
       "options": [
-        "correct quote from source text",
-        "another quote from source text",
-        "another quote from source text",
-        "another quote from source text"
+        "Complete, grammatically correct answer",
+        "Plausible but incorrect option",
+        "Another related but incorrect option",
+        "Similar but incorrect option"
       ],
-      "correct": "correct quote from source text"
+      "correct": "Complete, grammatically correct answer"
     }
   ]
 }
 
-CRITICAL:
-- Use only content from the text
-- Keep everything in source text's language
-- No translations to other languages
-- No made-up or modified options
-- Keep all options relevant to question
-- Use direct quotes for all options
-- Make answers unambiguous
-- Return valid JSON only`; 
+CRITICAL RULES:
+- Use the original language of the text
+- Ensure grammatical correctness
+- All content must exist in the text
+- Keep original context intact
+- Maintain factual accuracy
+- Return valid JSON only
+
+QUALITY CHECKLIST:
+✓ Quiz tests understanding
+✓ Flashcards focus on recall
+✓ All options are grammatically correct
+✓ Options are logical
+✓ Content is relevant`; 

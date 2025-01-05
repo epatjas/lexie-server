@@ -7,9 +7,19 @@ require('dotenv').config()                        // Load environment variables 
 const fs = require('fs');                         // File system module (currently unused - can be removed)
 const transcriptionPrompt = require('./prompts/transcriptionPrompt');    // Load prompts from separate files
 const studyMaterialsPrompt = require('./prompts/studyMaterialsPrompt');
+const { Readable } = require('stream');
+const { LRUCache } = require('lru-cache');
+const crypto = require('crypto');
 
 // Initialize Express app and middleware
 const app = express()
+
+// Add logging middleware at the top
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
 app.use(cors())  // Enable CORS for all routes
 
 // Configure Express to handle large payloads (needed for base64 images)
@@ -32,6 +42,28 @@ const REQUEST_TIMEOUT = 120000           // 2 minute timeout for requests
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 })
+
+// Configure audio cache
+const audioCache = new LRUCache({
+  max: 100,
+  maxSize: 500 * 1024 * 1024,
+  sizeCalculation: (value, key) => {
+    return value.length;
+  },
+  ttl: 1000 * 60 * 60 * 24 * 7, // 7 days
+});
+
+// Use a faster in-memory cache for recent requests
+const recentAudioCache = new Map();
+const RECENT_CACHE_SIZE = 10;
+
+// Helper function to generate cache key
+const generateCacheKey = (text, voice, speed) => {
+  return crypto
+    .createHash('md5')
+    .update(`${text}-${voice}-${speed}`)
+    .digest('hex');
+};
 
 // Request validation middleware
 const validateAnalyzeRequest = (req, res, next) => {
@@ -102,20 +134,40 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
     console.log(`[${new Date().toISOString()}] Waiting for all transcriptions...`)
     const transcriptionResponses = await Promise.all(transcriptionPromises)
     
+    // Clean and parse the transcription responses
+    const transcriptions = transcriptionResponses.map(resp => {
+      try {
+        const content = resp.choices[0].message.content;
+        // Clean up any markdown or extra characters
+        const cleanContent = content
+          .replace(/^```json\s*/, '')  // Remove opening ```json
+          .replace(/\s*```$/, '')      // Remove closing ```
+          .trim();
+
+        try {
+          return JSON.parse(cleanContent);
+        } catch (parseError) {
+          console.error('[Server] JSON parse error:', parseError);
+          console.error('[Server] Content that failed to parse:', cleanContent);
+          throw new Error('Failed to parse transcription response');
+        }
+      } catch (error) {
+        console.error('[Server] Transcription processing error:', error);
+        throw error;
+      }
+    });
+
     // Combine transcriptions and keep the title from the first one
-    const transcriptions = transcriptionResponses.map(resp => 
-      JSON.parse(resp.choices[0].message.content)
-    )
     const combinedTranscription = {
       title: transcriptions[0].title,
       text_content: {
         raw_text: transcriptions.map(t => t.text_content.raw_text).join('\n\n'),
         sections: transcriptions.flatMap(t => t.text_content.sections)
       }
-    }
+    };
 
     // Generate study materials from combined text
-    console.log(`[${new Date().toISOString()}] Generating study materials...`)
+    console.log(`[${new Date().toISOString()}] Generating study materials...`);
     const stream = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [{
@@ -124,37 +176,56 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
       }],
       max_tokens: 4096,
       stream: true
-    })
+    });
 
-    let studyMaterialsResponse = ''
+    let studyMaterialsResponse = '';
     for await (const chunk of stream) {
-      studyMaterialsResponse += chunk.choices[0]?.delta?.content || ''
+      studyMaterialsResponse += chunk.choices[0]?.delta?.content || '';
     }
 
     // Parse study materials
-    console.log(`[${new Date().toISOString()}] Parsing study materials response`)
+    console.log(`[${new Date().toISOString()}] Parsing study materials response`);
     const cleanStudyMaterialsResponse = studyMaterialsResponse
       .replace(/```json\n/, '')
       .replace(/\n```$/, '')
+      .trim();
 
-    let studyMaterials
+    let studyMaterials;
     try {
-      studyMaterials = JSON.parse(cleanStudyMaterialsResponse)
-      console.log(`[${new Date().toISOString()}] Successfully parsed study materials`)
+      // Check if response starts with { to validate it's JSON
+      if (!cleanStudyMaterialsResponse.startsWith('{')) {
+        console.error(`[${new Date().toISOString()}] Invalid study materials response:`, cleanStudyMaterialsResponse);
+        // Return a default structure instead of throwing
+        studyMaterials = {
+          flashcards: [],
+          quiz: {
+            questions: []
+          }
+        };
+      } else {
+        studyMaterials = JSON.parse(cleanStudyMaterialsResponse);
+        console.log(`[${new Date().toISOString()}] Successfully parsed study materials`);
+      }
     } catch (parseError) {
-      console.error(`[${new Date().toISOString()}] Failed to parse study materials:`, cleanStudyMaterialsResponse)
-      throw parseError
+      console.error(`[${new Date().toISOString()}] Failed to parse study materials:`, cleanStudyMaterialsResponse);
+      // Return a default structure instead of throwing
+      studyMaterials = {
+        flashcards: [],
+        quiz: {
+          questions: []
+        }
+      };
     }
 
     // Combine results
     const result = {
       title: combinedTranscription.title,
       text_content: combinedTranscription.text_content,
-      flashcards: studyMaterials.flashcards,
-      quiz: studyMaterials.quiz,
+      flashcards: studyMaterials.flashcards || [],
+      quiz: studyMaterials.quiz || { questions: [] },
       created_at: Date.now(),
       updated_at: Date.now()
-    }
+    };
 
     const totalTime = Date.now() - startTime;
     console.log(`[${new Date().toISOString()}] Analysis completed in ${totalTime}ms`)
@@ -207,6 +278,142 @@ app.get('/processing-status/:id', (req, res) => {
 const updateProcessingStatus = (id, stage) => {
   processingStatus.set(id, { stage, timestamp: Date.now() });
 };
+
+// TTS endpoint
+app.post('/tts', async (req, res) => {
+  const { text, type = 'chunk' } = req.body;
+  const voice = "nova";
+  const speed = 1.0;
+  
+  if (!text) {
+    return res.status(400).json({
+      error: 'Invalid request',
+      details: 'Text is required'
+    });
+  }
+
+  try {
+    const truncatedText = text.slice(0, 4096);
+    const cacheKey = generateCacheKey(truncatedText, voice, speed);
+
+    // For initial chunk requests, only process first paragraph
+    if (type === 'chunk') {
+      // Split by paragraphs and get first meaningful chunk
+      const paragraphs = truncatedText.split(/\n\n+/);
+      const firstChunk = paragraphs[0];
+      
+      // Generate cache key for this specific chunk
+      const chunkCacheKey = generateCacheKey(firstChunk, voice, speed);
+
+      // Check caches for chunk
+      if (recentAudioCache.has(chunkCacheKey)) {
+        console.log('[TTS] Recent cache hit for chunk!');
+        const audioBuffer = recentAudioCache.get(chunkCacheKey);
+        res.set({
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': audioBuffer.length,
+          'X-Total-Chunks': paragraphs.length.toString()
+        });
+        res.send(audioBuffer);
+        return;
+      }
+
+      // Make OpenAI request for first chunk
+      const response = await openai.audio.speech.create({
+        model: "tts-1",
+        voice,
+        input: firstChunk,
+        response_format: "mp3",
+        speed
+      });
+
+      const audioBuffer = Buffer.from(await response.arrayBuffer());
+      
+      // Cache the chunk
+      recentAudioCache.set(chunkCacheKey, audioBuffer);
+
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length,
+        'X-Total-Chunks': paragraphs.length.toString(),
+        'Cache-Control': 'public, max-age=604800',
+      });
+      
+      res.send(audioBuffer);
+      return;
+    }
+
+    // Check recent cache first (fastest)
+    if (recentAudioCache.has(cacheKey)) {
+      console.log('[TTS] Recent cache hit!');
+      const audioBuffer = recentAudioCache.get(cacheKey);
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBuffer.length,
+      });
+      res.send(audioBuffer);
+      return;
+    }
+
+    // Check disk cache next
+    const cachedAudio = audioCache.get(cacheKey);
+    if (cachedAudio) {
+      // Also add to recent cache
+      recentAudioCache.set(cacheKey, cachedAudio);
+      if (recentAudioCache.size > RECENT_CACHE_SIZE) {
+        const firstKey = recentAudioCache.keys().next().value;
+        recentAudioCache.delete(firstKey);
+      }
+      
+      console.log('[TTS] Disk cache hit!');
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': cachedAudio.length,
+        'Cache-Control': 'public, max-age=604800',
+      });
+      res.send(cachedAudio);
+      return;
+    }
+
+    console.log('[TTS] Cache miss. Making OpenAI API request...');
+    
+    // Make OpenAI request with optimized settings
+    const response = await openai.audio.speech.create({
+      model: "tts-1", 
+      voice,
+      input: truncatedText,
+      response_format: "mp3",
+      speed
+    });
+
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    audioCache.set(cacheKey, audioBuffer);
+
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': audioBuffer.length,
+      'Cache-Control': 'public, max-age=604800',
+    });
+    
+    res.send(audioBuffer);
+
+  } catch (error) {
+    console.error('[TTS] Error:', error);
+    res.status(500).json({
+      error: 'Text-to-speech failed',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// CORS preflight
+app.options('/tts', (req, res) => {
+  res.set({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+  }).status(200).send();
+});
 
 // Start the server
 app.listen(PORT, HOST, () => {
