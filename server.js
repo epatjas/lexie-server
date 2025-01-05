@@ -100,6 +100,67 @@ app.get('/', (req, res) => {
   res.json({ message: 'Lexie server is running!' })
 })
 
+// Add rate limiting configuration
+const rateLimiter = {
+  tokensPerMin: 30000,
+  current: 0,
+  lastReset: Date.now(),
+  queue: [],
+};
+
+// Add this before your OpenAI calls
+const checkRateLimit = async (requestedTokens) => {
+  const now = Date.now();
+  if (now - rateLimiter.lastReset > 60000) {
+    // Reset counter every minute
+    rateLimiter.current = 0;
+    rateLimiter.lastReset = now;
+  }
+
+  if (rateLimiter.current + requestedTokens > rateLimiter.tokensPerMin) {
+    // Wait until next minute if limit exceeded
+    const waitTime = 60000 - (now - rateLimiter.lastReset);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+    rateLimiter.current = 0;
+    rateLimiter.lastReset = Date.now();
+  }
+
+  rateLimiter.current += requestedTokens;
+};
+
+// Add retry logic to your API calls
+const makeOpenAIRequest = async (retries = 3) => {
+  try {
+    await checkRateLimit(5000); // Estimate tokens
+    const response = await openai.chat.completions.create({
+      // ... your existing options
+    });
+    return response;
+  } catch (error) {
+    if (error.code === 'rate_limit_exceeded' && retries > 0) {
+      const waitTime = parseInt(error.headers['retry-after-ms'] || 10000);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      return makeOpenAIRequest(retries - 1);
+    }
+    throw error;
+  }
+};
+
+const makeRequestWithRetry = async (fn, maxRetries = 3) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error.code === 'rate_limit_exceeded' && i < maxRetries - 1) {
+        const waitTime = Math.min(1000 * Math.pow(2, i), 10000);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
 // Main endpoint for analyzing images and generating study materials
 app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
   const startTime = Date.now();
@@ -111,23 +172,25 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
     // Process images in parallel
     const transcriptionPromises = images.map((image, index) => {
       console.log(`[${new Date().toISOString()}] Processing image ${index + 1}/${images.length}`)
-      return openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{
-          role: "user",
-          content: [{
-            type: "text",
-            text: transcriptionPrompt
-          }, {
-            type: "image_url",
-            image_url: {
-              url: `data:image/jpeg;base64,${image}`,
-              detail: "high"
-            }
-          }]
-        }],
-        max_tokens: 4096,
-      })
+      return makeRequestWithRetry(() => 
+        openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{
+            role: "user",
+            content: [{
+              type: "text",
+              text: transcriptionPrompt
+            }, {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${image}`,
+                detail: "high"
+              }
+            }]
+          }],
+          max_tokens: 4096,
+        })
+      );
     })
 
     // Wait for all transcriptions
@@ -168,15 +231,17 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
 
     // Generate study materials from combined text
     console.log(`[${new Date().toISOString()}] Generating study materials...`);
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
-      }],
-      max_tokens: 4096,
-      stream: true
-    });
+    const stream = await makeRequestWithRetry(() => 
+      openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{
+          role: "user",
+          content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
+        }],
+        max_tokens: 4096,
+        stream: true
+      })
+    );
 
     let studyMaterialsResponse = '';
     for await (const chunk of stream) {

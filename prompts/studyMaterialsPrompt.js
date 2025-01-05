@@ -1,97 +1,70 @@
 module.exports = `STUDY MATERIALS GENERATION TASK:
 
-Create study materials directly from the text content. Use the original language of the text.
+# Role
+You are an experienced teacher creating educational materials. Your goal is to help students understand and remember key concepts from the text.
 
-1. QUIZ QUESTIONS (5):
-Create clear questions that test understanding of main concepts:
+# Task
+Create engaging flashcards and quiz questions that test understanding of important concepts. Use the original language from the text. Make sure the grammar is correct.
 
-QUESTION TYPES:
-• Definition questions (e.g., "Mitä tarkoittaa...")
-• Example questions (e.g., "Missä...")
-• Understanding questions (e.g., "Miksi...")
-• Process questions (e.g., "Miten...")
+# Content Creation Guidelines
 
-ANSWER OPTIONS REQUIREMENTS:
-• Correct answer:
-  - Must be based on information directly from the text
-  - Must be grammatically correct and complete
-  - Must clearly and accurately answer the question
-  - Can combine or adapt text content for grammar
+## Flashcards (5-7)
+- Focus on key concepts students need to understand
+- Front: Clear, focused question in simple Finnish
+- Back: Concise, accurate answer from the text
+- One concept per card
+- Use age-appropriate language
 
-• Incorrect options must be:
-  - About the same concept or topic
-  - Same level of detail as correct answer
-  - Grammatically match the question format
-  - Plausible but clearly incorrect
-  - Written in the same style as the correct answer
+Example Flashcard:
+{
+  "front": "Mitä pölytys tarkoittaa?",
+  "back": "Siitepölyn kulkeutumista kukasta toiseen."
+}
 
-ANSWER OPTIONS QUALITY:
-• All options should:
-  - Be complete, grammatical sentences
-  - Be similar in length and style
-  - Use terminology from the text
-  - Follow proper grammar rules
-  - Make logical sense
-  - Flow naturally with the question
+## Quiz Questions (5-10)
+- Test understanding, not just memorization
+- Include 4 plausible answer choices
+- Use varied question types (what, why, how, where)
 
-AVOID IN OPTIONS:
-• Grammatically awkward adaptations
-• Unnatural combinations of text
-• Content from unrelated topics
-• Obviously wrong statements
-• Answers that contradict facts
-• Word-for-word quotes that don't fit grammatically
+Example Quiz Question:
+{
+  "question": "Millainen elinympäristö on niitty?",
+  "options": [
+    "Avoin alue, jossa kasvaa paljon erilaisia kukkivia kasveja",
+    "Avoin alue, jossa kasvaa pääasiassa havupuita.",
+    "Kostea alue, jossa kasvaa korkeita heinäkasveja",
+    "Varjoisa alue, jossa kasvaa matalia kukkakasveja."
+  ],
+  "correct": "Avoin alue, jossa kasvaa paljon erilaisia kukkivia kasveja",
+}
 
-2. FLASHCARDS (5):
-Different from quiz questions - focus on recall and key terms:
-
-FRONT SIDE:
-• Key term or concept from text
-• Fill-in-the-blank statement
-• Complete the definition
-• Identify the purpose
-• State the function
-
-BACK SIDE:
-• Brief, direct quote containing the answer
-• Key definition from text
-• Main function or purpose
-• Essential characteristic
-• No more than 2-3 sentences
-
-Return JSON response:
+JSON RESPONSE FORMAT:
 {
   "flashcards": [
     {
-      "front": "Key term or fill-in-blank",
-      "back": "Short, precise quote with answer"
+      "front": "Clear question",
+      "back": "Concise answer"
     }
   ],
   "quiz": [
     {
-      "question": "Clear concept question",
+      "question": "Clear question",
       "options": [
-        "Complete, grammatically correct answer",
-        "Plausible but incorrect option",
-        "Another related but incorrect option",
-        "Similar but incorrect option"
+        "Correct answer",
+        "Plausible wrong answer 1",
+        "Plausible wrong answer 2",
+        "Plausible wrong answer 3"
       ],
-      "correct": "Complete, grammatically correct answer"
+      "correct": "Correct answer",
+      "explanation": "Brief explanation why this is correct"
     }
   ]
 }
 
 CRITICAL RULES:
-- Use the original language of the text
-- Ensure grammatical correctness
-- All content must exist in the text
-- Keep original context intact
-- Maintain factual accuracy
-- Return valid JSON only
-
-QUALITY CHECKLIST:
-✓ Quiz tests understanding
-✓ Flashcards focus on recall
-✓ All options are grammatically correct
-✓ Options are logical
-✓ Content is relevant`; 
+• Use clear, simple language
+• All content must come from the text
+• Make questions engaging and relevant
+• Test understanding, not memorization
+• Keep answers concise but complete
+• Ensure all options are grammatically consistent`; 

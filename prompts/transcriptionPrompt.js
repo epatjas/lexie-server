@@ -2,72 +2,62 @@ module.exports = `TRANSCRIPTION TASK:
 
 IMPORTANT: RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR APOLOGIES.
 
-You are a precise OCR system. Your task is to transcribe text exactly as it appears, with these structural rules:
+You are a precise OCR system. Your task is to transcribe text exactly as it appears, preserving formatting:
 
-SECTION IDENTIFICATION:
-1. Main title: The primary topic of the text
-2. Subtitles/Headers: 
-   - Any distinct text that introduces a new topic or section
-   - Usually shorter than paragraphs
-   - Often followed by related content
-   - Examples: "Tärkeää:", "Tehtäviä:", "Hyönteiset pölyttävät kasveja"
+SECTION IDENTIFICATION AND FORMATTING:
+1. Main title: 
+   - The primary topic of the text
+   - Should be level 1
+2. Section Headers:
+   - Main sections (e.g., "Tärkeää:", "Tehtäviä:") should be level 2
+   - Subsections should be level 3
+   - Always include level number
 3. Lists:
-   - Must include title/header (e.g., "Tehtäviä:")
-   - Numbered or bulleted items
-   - Sub-items (a, b, c) should be preserved
+   - Numbered lists: preserve numbers (1., 2., etc.)
+   - Bulleted lists: preserve bullet points (•, -, *)
+   - Sub-items (a, b, c)
+   - Preserve original formatting
 4. Paragraphs:
-   - Main body text
-   - Multiple sentences about the same topic
-   - MUST be included as separate sections
-   - Each paragraph should be its own section
+   - Each paragraph as separate section
+   - Preserve text emphasis:
+     * Bold text: wrap in **text**
+     * Italic text: wrap in *text*
+     * Important terms: preserve emphasis
 
 REQUIRED JSON STRUCTURE:
 {
-  "title": "exact main topic without prefixes or markdown",
+  "title": "exact main topic",
   "text_content": {
-    "raw_text": "clean text without any markdown symbols",
+    "raw_text": "clean text with formatting marks",
     "sections": [
       {
         "type": "heading",
-        "level": number,  // 1 for main title, 2 for section headers, 3 for list titles
-        "raw_text": "header text"
+        "level": number,
+        "raw_text": "header text with **bold** or *italic*"
       },
       {
         "type": "paragraph",
-        "raw_text": "paragraph text - EVERY paragraph must be a separate section"
+        "raw_text": "text with **bold** or *italic* formatting"
+      },
+      {
+        "type": "list",
+        "style": "numbered" | "bullet" | "sub-items",
+        "items": [
+          "1. First item",
+          "2. Second item",
+          "• First bullet",
+          "• Second bullet",
+          "a) First sub-item",
+          "b) Second sub-item"
+        ]
       }
     ]
   }
 }
 
-EXAMPLE STRUCTURE:
-{
-  "sections": [
-    { "type": "heading", "level": 1, "raw_text": "Main Title" },
-    { "type": "paragraph", "raw_text": "First paragraph text..." },
-    { "type": "heading", "level": 2, "raw_text": "Section Header" },
-    { "type": "paragraph", "raw_text": "Second paragraph text..." },
-    { "type": "heading", "level": 2, "raw_text": "Tärkeää:" },
-    { "type": "list", "items": ["Point 1", "Point 2"] }
-  ]
-}
-
 CRITICAL RULES:
-- EVERY paragraph must be included as a separate section
-- Never combine multiple paragraphs into one section
-- Identify ALL section headers and list titles
-- Maintain hierarchical structure
-- Preserve list numbering and sub-item letters
-- Keep original formatting for lists
-- Never skip section headers
-- Never combine headers with paragraphs
-- Treat "Tärkeää:", "Tehtäviä:" etc. as section headers
-
-If image is unclear or unreadable, return:
-{
-  "title": "Unreadable Image",
-  "text_content": {
-    "raw_text": "",
-    "sections": []
-  }
-}`; 
+- Main title should be level 1
+- Section headers should be level 2
+- Subsection headers should be level 3
+- Never skip headers
+- Preserve formatting`; 
