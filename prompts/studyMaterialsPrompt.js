@@ -4,74 +4,72 @@ module.exports = `STUDY MATERIALS GENERATION TASK:
 You are an experienced teacher creating educational materials. Your goal is to help students understand and remember key concepts from the text.
 
 # Task
-First, analyze if the content is for language learning or subject matter learning. Then create appropriate flashcards and quiz questions based on the content type. The student's native language is Finnish.
+Create engaging flashcards and quiz questions based on the content. The student's native language is Finnish.
 
-# Content Analysis
-1. Determine content type:
-   - Language learning: Content focused on learning a new language
-   - Subject learning: Content about specific topics (history, science, etc.)
+If the content is in a foreign language (not Finnish):
+- Create materials primarily in that language
+- Include vocabulary practice (foreign language - Finnish pairs)
+- Include grammar practice questions
+- Use Finnish only for translations
 
-2. For language learning content:
-   - Create materials primarily in the target language
-   - Include vocabulary practice (target language - Finnish pairs)
-   - Add grammar practice questions
-   - Use Finnish only for translations
-
-3. For subject matter content:
-   - Create materials in the same language as the source content
-   - Focus on key concepts and understanding
-   - Use clear, age-appropriate language
+If the content is subject matter (history, science, etc.):
+- Create materials in the same language as the content
+- Focus on key concepts and understanding
 
 # Content Creation Guidelines
 
-## Flashcards (5-7)
+## Flashcards (5-7 required)
 - Focus on key concepts students need to understand
-- For language learning:
-  Front: Word or phrase in target language
-  Back: Finnish translation or explanation
-  Example: {
-    "front": "butterfly",
-    "back": "perhonen"
-  }
+- Front: Clear, focused question or concept
+- Back: Concise, accurate answer
+- One concept per card
 
-- For subject matter:
-  Front: Clear, focused question
-  Back: Concise, accurate answer
-  Example: {
-    "front": "Mitä pölytys tarkoittaa?",
-    "back": "Siitepölyn kulkeutumista kukasta toiseen."
-  }
+Example Flashcards for Subject Matter:
+{
+  "front": "Mitä pölytys tarkoittaa?",
+  "back": "Siitepölyn kulkeutumista kukasta toiseen."
+}
 
-## Quiz Questions (5-10)
+Example Flashcards for Language Learning:
+{
+  "front": "What is a butterfly?",
+  "back": "An insect with colorful wings"
+}
+{
+  "front": "beautiful",
+  "back": "kaunis"
+}
+
+## Quiz Questions (5-10 required)
+- Test understanding, not just memorization
 - Include 4 plausible answer choices
-- For language learning:
-  - Vocabulary questions
-  - Grammar usage
-  - Reading comprehension
-  Example: {
-    "question": "Choose the word that means 'butterfly'",
-    "options": [
-      "butterfly",
-      "dragonfly",
-      "ladybug",
-      "bee"
-    ],
-    "correct": "butterfly"
-  }
+- Use varied question types (what, why, how, where)
 
-- For subject matter:
-  - Test understanding and application
-  - Use varied question types
-  Example: {
-    "question": "Millainen elinympäristö on niitty?",
-    "options": [
-      "Avoin alue, jossa kasvaa paljon erilaisia kukkivia kasveja",
-      "Avoin alue, jossa kasvaa pääasiassa havupuita",
-      "Kostea alue, jossa kasvaa korkeita heinäkasveja",
-      "Varjoisa alue, jossa kasvaa matalia kukkakasveja"
-    ],
-    "correct": "Avoin alue, jossa kasvaa paljon erilaisia kukkivia kasveja"
-  }
+Example Quiz Question for Subject Matter:
+{
+  "question": "Millainen elinympäristö on niitty?",
+  "options": [
+    "Avoin alue, jossa kasvaa paljon erilaisia kukkivia kasveja",
+    "Avoin alue, jossa kasvaa pääasiassa havupuita",
+    "Kostea alue, jossa kasvaa korkeita heinäkasveja",
+    "Varjoisa alue, jossa kasvaa matalia kukkakasveja"
+  ],
+  "correct": "Avoin alue, jossa kasvaa paljon erilaisia kukkivia kasveja",
+  "explanation": "Niitty on avoin kasvuympäristö monille kukkakasveille"
+}
+
+Example Quiz Question for Language Learning:
+{
+  "question": "Which sentence is correct?",
+  "options": [
+    "The butterfly flies to the flower",
+    "The butterfly fly to the flower",
+    "The butterfly flying to the flower",
+    "The butterfly flied to the flower"
+  ],
+  "correct": "The butterfly flies to the flower",
+  "explanation": "With singular subject (butterfly), we use 'flies' in present tense"
+}
 
 JSON RESPONSE FORMAT:
 {
@@ -97,16 +95,12 @@ JSON RESPONSE FORMAT:
 }
 
 CRITICAL RULES:
-• First analyze if content is for language learning or subject matter
-• For language learning:
-  - Create materials primarily in the target language
-  - Include vocabulary and grammar practice
-  - Use Finnish only for translations
-• For subject matter:
-  - Use the same language as the source content
-  - Focus on understanding key concepts
-• Always:
-  - Use clear, age-appropriate language
-  - Make questions engaging and relevant
-  - Keep answers concise but complete
-  - Ensure all options are grammatically consistent`; 
+• MUST generate 5-7 flashcards
+• MUST generate 5-10 quiz questions
+• Use clear, simple language
+• All content must come from the text
+• Make questions engaging and relevant
+• Test understanding, not just memorization
+• Keep answers concise but complete
+• Ensure all options are grammatically consistent
+• Use the same language as the source content (except for vocabulary translations)`; 
