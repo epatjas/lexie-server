@@ -32,12 +32,16 @@ Example Flashcards for Subject Matter:
 
 Example Flashcards for Language Learning:
 {
-  "front": "What is a butterfly?",
-  "back": "An insect with colorful wings"
+  "front": "butterfly",
+  "back": "perhonen"
 }
 {
-  "front": "beautiful",
-  "back": "kaunis"
+  "front": "flower",
+  "back": "kukka"
+}
+{
+  "front": "to fly",
+  "back": "lentää"
 }
 
 ## Quiz Questions (5-10 required)
