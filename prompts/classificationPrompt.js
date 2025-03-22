@@ -1,51 +1,62 @@
-module.exports = `Analyze the transcribed educational content and classify it into one of two categories. Return ONLY a JSON response with classification and reasoning. 
+module.exports = `Analyze the transcribed educational content and determine if it's textbook material or a problem/assignment. Return ONLY a JSON response.
 
-Content Types 
-Textbook Material (Exam Prep)
-* Educational text explaining multiple concepts
-* Comprehensive coverage of a topic
-* Multiple paragraphs or sections
-* Definitions, explanations, and examples
-* May include diagrams or illustrations with explanatory captions
-* Content you would typically find in a textbook or study guide
-* Content intended for learning and reviewing concepts 
+## Content Type Definitions
 
-Problem/Assignment (Homework Assistance)
-* Specific task requiring solution
-* Contains a clear question or objective
-* Often includes numerical values, variables, or specific scenarios
-* May have blank spaces for answers
-* Typically shorter and more focused than textbook material
-* May include multiple-choice options
-* Example problems with or without solutions
-* Single concept explanations or worked examples
-* Practice exercises or questions 
+TEXTBOOK_MATERIAL:
+* Contains multiple concepts or comprehensive topic coverage
+* Has structured organization (headings, sections, paragraphs)
+* Primarily uses declarative statements explaining how things work
+* Contains definition patterns: "X is defined as", "X refers to", "X means"
+* Contains multiple examples illustrating different aspects of a concept
+* Mostly uses third-person perspective
+* Often contains phrases like "in this chapter", "we will explore", "key concepts include"
 
-Decision Factors
-* Content length (longer suggests textbook material)
-* Presence of question marks or directives (suggests homework assistance)
-* Keywords like "solve," "find," "calculate," "explain" (suggests homework assistance)
-* Numbered questions or blank answer spaces (suggests homework assistance)
-* Multiple headings or sections (suggests textbook material)
-* Practice problems (suggests homework assistance even if including explanation)
-* Language used (instructional vs. questioning) 
+PROBLEM_ASSIGNMENT:
+* Contains specific tasks or questions requiring solutions
+* Uses imperative language: "solve", "find", "calculate", "determine"
+* Often includes question marks, blank spaces, or numbered questions
+* Typically contains specific values, variables, or scenarios to analyze
+* May include phrases like "problem set", "homework", "exercises", "assignment"
+* Often uses second-person perspective ("you") or first-person questions ("I need to find")
+* May include worked examples focusing on a solution process
 
-JSON Response Format
+## Decisive Indicators (Prioritized)
+
+1. PROBLEM indicators (highest priority):
+   * Direct questions ("What is", "How many", "Find x")
+   * Numbered problems or exercises
+   * Fill-in-the-blank sections
+   * Step-by-step solution guides
+   * Phrases like "solve for", "calculate the", "your task is"
+   * Multiple practice questions on the same topic
+
+2. TEXTBOOK indicators:
+   * Multiple definition statements
+   * Overview sections followed by detailed explanations
+   * Historical context or background information
+   * Multiple interconnected concepts explained
+   * Summary sections or review points
+   * Theoretical explanations without specific problems to solve
+
+## Mixed Content Rules
+
+* If content contains both explanations and problems:
+  * Check if problems are illustrative examples (supports TEXTBOOK) or the main focus (supports PROBLEM)
+  * Determine if explanations provide background for a specific task (PROBLEM) or are comprehensive (TEXTBOOK)
+  * Count the ratio of explanatory text to problem statements
+
+JSON Response Format:
 {
   "classification": "TEXTBOOK_MATERIAL | PROBLEM_ASSIGNMENT",
   "confidence": "HIGH | MEDIUM | LOW",
-  "reasoning": "Brief explanation of classification decision based on specific content features",
-  "subject_area": "Math | Science | Language | History | Other",
-  "language": "Finnish | English | Other",
+  "primary_indicators": ["List the 2-3 most decisive patterns found in the content"],
   "processing_approach": "Textbook Content Processing | Problem Assistance"
-} 
+}
 
-Critical Rules
-* Analyze ONLY the content provided
-* Default to Problem Assistance when uncertain
-* Be decisive - choose the SINGLE most appropriate classification
-* For TEXTBOOK_MATERIAL, set processing_approach to "Textbook Content Processing"
-* For PROBLEM_ASSIGNMENT, set processing_approach to "Problem Assistance"
-* If content contains both explanatory material AND problems, classify based on the primary purpose
-* Examples and single concept explanations should be classified as PROBLEM_ASSIGNMENT
-* Return ONLY valid JSON - no additional explanations`; 
+Critical Rules:
+* Focus ONLY on content type, not subject matter
+* When truly uncertain, default to PROBLEM_ASSIGNMENT
+* Examples alone are not sufficient to classify as TEXTBOOK_MATERIAL
+* Content with multiple paragraphs of explanation before presenting 1-2 problems should be TEXTBOOK_MATERIAL
+* Content with brief explanation followed by multiple problems should be PROBLEM_ASSIGNMENT
+* Return ONLY valid JSON with no additional text or explanations`; 
