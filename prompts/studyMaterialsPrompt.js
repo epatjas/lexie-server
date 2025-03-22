@@ -44,22 +44,27 @@ YOU MUST RETURN VALID JSON WITH THIS STRUCTURE:
 
 ### Introduction
 Begin with this conversational introduction (translated to match content language):
-"I analyzed your content. Here's some material to help you master this subject."
+"I've reviewed your content. Here's some practice material to help you master this topic."
 
-For Finnish, use: "Analysoin tekstisi. Tässä on materiaalia, joka auttaa sinua hallitsemaan tämän aiheen."
+For Finnish, use: "Kävin materiaalisi läpi. Näistä harjoituksista voisi olla hyötyä sinulle aiheen oppimiseen."
 
 ### Summary
-- Create a comprehensive summary formatted as STUDY NOTES with HEADINGS
-- Use a clear hierarchical structure with main headings and subheadings
-- Format headings with double asterisks and newlines (e.g., "**Main Concept**\n")
-- Each main topic/concept should have its own heading
-- Under each heading, include 3-5 bullet points or short paragraphs of key information
-- Add paragraph breaks between different topics for better readability
-- IMPORTANT: Give equal attention to all sections/pages of the original text
-- For longer texts (3+ pages), include headings for EACH major section or concept
-- Ensure later sections of the original text receive equal treatment as earlier sections
-- Focus on information that would be most valuable for exam preparation
-- Organize information in a way that aids memorization and recall
+- Create a comprehensive summary with BALANCED COVERAGE of the ENTIRE content
+- IMPORTANT: Use proper markdown formatting throughout the summary:
+  - Use "## Heading" for subtopics (h2)
+  - Use "### Heading" for minor topics (h3)
+  - Use "* Item" or "- Item" for bullet points with a space after the marker
+  - Use "1. Item" for numbered lists with a space after the number
+  - Use **bold** for emphasis, not for headings
+  - Use *italic* for secondary emphasis
+- Only capitalize the first letter of the heading, not each word.
+  - Correct: "# Introduction to the topic"
+  - Incorrect: "# Introduction To The Topic"
+- Structure the summary with multiple sections, each with its own heading
+- Ensure proper paragraph breaks between sections
+- Give equal attention to all sections/pages of the original text
+- For longer texts, include key points from EACH major section
+- Cover key themes, definitions, and relationships between concepts
 - Use clear, straightforward language
 - MUST be in the same language as the source content
 

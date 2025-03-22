@@ -13,10 +13,10 @@ SECTION IDENTIFICATION AND FORMATTING:
    - Subsections should be level 3
    - Always include level number
 3. Lists:
-   - Numbered lists: preserve numbers (1., 2., etc.)
-   - Bulleted lists: preserve bullet points (•, -, *)
-   - Sub-items (a, b, c)
-   - Preserve original formatting
+   - Numbered lists: normalize to simple "1. Item", "2. Item" format
+   - Bulleted lists: normalize to "• Item" format
+   - Remove any duplicate or complex numbering (e.g., change "1. 1)" to just "1.")
+   - Preserve original content
 4. Language Learning Content:
    - Key vocabulary: wrap words in **word**
    - Speaker names in dialogues: wrap in **Name**
@@ -47,12 +47,12 @@ REQUIRED JSON STRUCTURE:
         "type": "list",
         "style": "numbered" | "bullet" | "sub-items",
         "items": [
-          "1. First item",
-          "2. Second item",
-          "• First bullet",
-          "• Second bullet",
-          "a) First sub-item",
-          "b) Second sub-item"
+          "First item",
+          "Second item",
+          "First bullet",
+          "Second bullet",
+          "First sub-item",
+          "Second sub-item"
         ]
       }
     ]
@@ -66,4 +66,8 @@ CRITICAL RULES:
 - Never skip headers
 - Always bold key vocabulary words
 - Always bold speaker names in dialogues
-- Preserve formatting`; 
+- Format lists consistently with simple numbering/bullets
+- Normalize any unusual list numbering formats
+- Preserve formatting
+- Do not include any markdown syntax (like # or ##) in the raw_text fields
+- Items in lists should not include the numbers or bullets in the items array`; 
