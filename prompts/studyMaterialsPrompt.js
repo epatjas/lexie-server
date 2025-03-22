@@ -49,10 +49,18 @@ Begin with this conversational introduction (translated to match content languag
 For Finnish, use: "Analysoin tekstisi. Tässä on materiaalia, joka auttaa sinua hallitsemaan tämän aiheen."
 
 ### Summary
-- Create a concise summary that captures the main concepts (250-500 words)
-- Cover key themes, definitions, and relationships between concepts
+- Create a comprehensive summary formatted as STUDY NOTES with HEADINGS
+- Use a clear hierarchical structure with main headings and subheadings
+- Format headings with double asterisks and newlines (e.g., "**Main Concept**\n")
+- Each main topic/concept should have its own heading
+- Under each heading, include 3-5 bullet points or short paragraphs of key information
+- Add paragraph breaks between different topics for better readability
+- IMPORTANT: Give equal attention to all sections/pages of the original text
+- For longer texts (3+ pages), include headings for EACH major section or concept
+- Ensure later sections of the original text receive equal treatment as earlier sections
+- Focus on information that would be most valuable for exam preparation
+- Organize information in a way that aids memorization and recall
 - Use clear, straightforward language
-- Organize information logically
 - MUST be in the same language as the source content
 
 ### Flashcards
