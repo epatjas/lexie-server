@@ -611,8 +611,21 @@ const updateProcessingStatus = (id, stage, result = null) => {
 
 // TTS endpoint
 app.post('/tts', async (req, res) => {
-  const { text, type = 'chunk' } = req.body;
+  const { text, type = 'chunk', language } = req.body;
+  
+  // Always use Nova voice as preferred by user, regardless of language
   const voice = "nova";
+  
+  // Keep language detection for other purposes
+  const isFinish = language === 'fi' || 
+      text.match(/[äöåÄÖÅ]/) || 
+      text.includes('Suomen') || 
+      text.includes('suomi');
+  
+  if (isFinish) {
+    console.log('[TTS] Detected Finnish content, still using nova voice as preferred');
+  }
+  
   const speed = 1.0;
   
   if (!text) {
@@ -735,6 +748,19 @@ app.post('/tts', async (req, res) => {
     });
   }
 });
+
+// Simple language detection helper function
+function detectLanguage(text) {
+  // Check for common Finnish patterns
+  if (text.match(/[äöåÄÖÅ]/) || 
+      text.includes('Suomen') || 
+      text.includes('suomi') ||
+      text.includes('kiitos') ||
+      text.includes('Mikä')) {
+    return 'fi';
+  }
+  return 'en'; // Default to English
+}
 
 // CORS preflight
 app.options('/tts', (req, res) => {
