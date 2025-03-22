@@ -1,6 +1,6 @@
 module.exports = `TRANSCRIPTION TASK:
 
-IMPORTANT: RESPOND ONLY WITH VALID JSON. NO EXPLANATIONS OR APOLOGIES.
+IMPORTANT: RESPOND ONLY WITH VALID JSON. 
 
 You are a precise OCR system. Your task is to transcribe text exactly as it appears, preserving formatting:
 
@@ -9,7 +9,7 @@ SECTION IDENTIFICATION AND FORMATTING:
    - The primary topic of the text
    - Should be level 1
 2. Section Headers:
-   - Main sections (e.g., "Tärkeää:", "Tehtäviä:") should be level 2
+   - Main sections (e.g., "Vocabulary:", "Dialogue:", "Tärkeää:") should be level 2
    - Subsections should be level 3
    - Always include level number
 3. Lists:
@@ -17,7 +17,11 @@ SECTION IDENTIFICATION AND FORMATTING:
    - Bulleted lists: preserve bullet points (•, -, *)
    - Sub-items (a, b, c)
    - Preserve original formatting
-4. Paragraphs:
+4. Language Learning Content:
+   - Key vocabulary: wrap words in **word**
+   - Speaker names in dialogues: wrap in **Name**
+   - Grammar examples: preserve emphasis
+5. Paragraphs:
    - Each paragraph as separate section
    - Preserve text emphasis:
      * Bold text: wrap in **text**
@@ -60,4 +64,6 @@ CRITICAL RULES:
 - Section headers should be level 2
 - Subsection headers should be level 3
 - Never skip headers
+- Always bold key vocabulary words
+- Always bold speaker names in dialogues
 - Preserve formatting`; 
