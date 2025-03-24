@@ -9,6 +9,7 @@ const transcriptionPrompt = require('./prompts/transcriptionPrompt');    // Load
 const studyMaterialsPrompt = require('./prompts/studyMaterialsPrompt');
 const homeworkClassificationPrompt = require('./prompts/classificationPrompt');
 const homeworkHelpPrompt = require('./prompts/homeworkHelpPrompt');
+const lexieTutorPrompt = require('./prompts/lexieTutorPrompt');
 const { Readable } = require('stream');
 const { LRUCache } = require('lru-cache');
 const crypto = require('crypto');
@@ -238,6 +239,9 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
       openai.chat.completions.create({
         model: "gpt-4o",
         messages: [{
+          role: "system",
+          content: "You are an AI that analyzes educational content. You MUST respond ONLY with a valid JSON object."
+        }, {
           role: "user",
           content: `${homeworkClassificationPrompt}\n\nContent to classify:\n${combinedTranscription.text_content.raw_text}`,
         }],
@@ -258,20 +262,25 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
     try {
       // Clean up any markdown formatting before parsing
       const cleanedResult = classificationResult
-        .replace(/^```json\s*/i, '')  // Remove opening ```json
-        .replace(/^```\s*/i, '')      // Remove opening ```
+        .replace(/^```json\s*/i, '')  // Remove opening ```json with case insensitivity
+        .replace(/^```\s*/i, '')      // Remove opening ``` without json prefix
         .replace(/\s*```$/i, '')      // Remove closing ```
         .trim();
         
       console.log(`[${new Date().toISOString()}] Cleaned classification result for parsing`);
       
-      const parsedClassification = JSON.parse(cleanedResult);
-      classification = {
-        ...classification, // Maintain defaults
-        ...parsedClassification // Override with parsed values
-      };
-      console.log(`[${new Date().toISOString()}] Content classified as: ${classification.classification} (${classification.subject_area})`);
-      console.log(`[${new Date().toISOString()}] Processing approach: ${classification.processing_approach}`);
+      // Add validation check for JSON structure
+      if (cleanedResult.startsWith('{') && cleanedResult.endsWith('}')) {
+        const parsedClassification = JSON.parse(cleanedResult);
+        classification = {
+          ...classification, // Maintain defaults
+          ...parsedClassification // Override with parsed values
+        };
+        console.log(`[${new Date().toISOString()}] Content classified as: ${classification.classification} (${classification.subject_area})`);
+      } else {
+        console.log(`[${new Date().toISOString()}] Classification result is not valid JSON, using defaults`);
+        // Use default values, already set above
+      }
     } catch (parseError) {
       console.error('[Server] Classification parse error:', parseError);
       console.error('[Server] Content that failed to parse:', classificationResult);
@@ -329,9 +338,15 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
 
       let homeworkHelp;
       try {
-        homeworkHelp = JSON.parse(jsonContent);
+        if (jsonContent.trim().startsWith('{') && jsonContent.trim().endsWith('}')) {
+          homeworkHelp = JSON.parse(jsonContent);
+          console.log(`[${new Date().toISOString()}] Successfully parsed homework help`);
+        } else {
+          throw new Error("Invalid JSON format");
+        }
       } catch (parseError) {
         console.error(`[${new Date().toISOString()}] Failed to parse homework help:`, parseError);
+        // Return a default structure matching the expected format
         homeworkHelp = {
           assignment: {
             facts: ["Content could not be properly analyzed"],
@@ -381,13 +396,13 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: "You are an AI that creates educational study materials. Always respond in valid JSON format with introduction, summary, flashcards array, and quiz array."
+            content: "You are an AI that creates educational study materials. You MUST respond in valid JSON format with an introduction, summary, flashcards array, and quiz array. Do not include any additional text outside of the JSON object. Your response should be ONLY a valid JSON object with no markdown formatting."
           }, {
             role: "user",
             content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
           }],
           max_tokens: 4096,
-          stream: true  // Make sure this is present
+          stream: true
         })
       );
 
@@ -398,9 +413,15 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
 
       let studyMaterials;
       try {
-        // With response_format: json_object, we can parse directly
-        studyMaterials = JSON.parse(studyMaterialsResponse);
-        console.log(`[${new Date().toISOString()}] Successfully parsed JSON response`);
+        // First try to get a valid JSON response
+        if (studyMaterialsResponse.trim().startsWith('{') && studyMaterialsResponse.trim().endsWith('}')) {
+          studyMaterials = JSON.parse(studyMaterialsResponse);
+          console.log(`[${new Date().toISOString()}] Successfully parsed JSON response`);
+        } else {
+          // Force a more structured prompt to get proper JSON
+          console.log(`[${new Date().toISOString()}] Response is not valid JSON, generating structured fallback`);
+          throw new Error("Not valid JSON");
+        }
       } catch (parseError) {
         console.error(`[${new Date().toISOString()}] Failed direct JSON parse, attempting extraction:`, parseError);
         
@@ -419,6 +440,10 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
           }
         } catch (extractError) {
           console.error(`[${new Date().toISOString()}] Failed to extract JSON:`, extractError);
+          
+          // Use the fallback approach more aggressively
+          console.log(`[${new Date().toISOString()}] Using basic fallback structure for study materials`);
+          
           // Provide a basic fallback structure
           studyMaterials = {
             introduction: "I analyzed your content. Here's some material to help you master this subject.",
@@ -426,6 +451,9 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
             flashcards: [],
             quiz: []
           };
+          
+          // Set flag to immediately trigger fallback content generation
+          needsFallback = true;
         }
       }
 
@@ -854,6 +882,9 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
       openai.chat.completions.create({
         model: "gpt-4o",
         messages: [{
+          role: "system",
+          content: "You are an AI that analyzes educational content. You MUST respond ONLY with a valid JSON object."
+        }, {
           role: "user",
           content: `${homeworkClassificationPrompt}\n\nContent to classify:\n${combinedTranscription.text_content.raw_text}`,
         }],
@@ -881,12 +912,18 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         
       console.log(`[${new Date().toISOString()}] Cleaned classification result for parsing`);
       
-      const parsedClassification = JSON.parse(cleanedResult);
-      classification = {
-        ...classification, // Maintain defaults
-        ...parsedClassification // Override with parsed values
-      };
-      console.log(`[${new Date().toISOString()}] Content classified as: ${classification.classification} (${classification.subject_area})`);
+      // Add validation check for JSON structure
+      if (cleanedResult.startsWith('{') && cleanedResult.endsWith('}')) {
+        const parsedClassification = JSON.parse(cleanedResult);
+        classification = {
+          ...classification, // Maintain defaults
+          ...parsedClassification // Override with parsed values
+        };
+        console.log(`[${new Date().toISOString()}] Content classified as: ${classification.classification} (${classification.subject_area})`);
+      } else {
+        console.log(`[${new Date().toISOString()}] Classification result is not valid JSON, using defaults`);
+        // Use default values, already set above
+      }
     } catch (parseError) {
       console.error('[Server] Classification parse error:', parseError);
       console.error('[Server] Content that failed to parse:', classificationResult);
@@ -934,8 +971,12 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
 
       let homeworkHelp;
       try {
-        homeworkHelp = JSON.parse(jsonContent);
-        console.log(`[${new Date().toISOString()}] Successfully parsed homework help`);
+        if (jsonContent.trim().startsWith('{') && jsonContent.trim().endsWith('}')) {
+          homeworkHelp = JSON.parse(jsonContent);
+          console.log(`[${new Date().toISOString()}] Successfully parsed homework help`);
+        } else {
+          throw new Error("Invalid JSON format");
+        }
       } catch (parseError) {
         console.error(`[${new Date().toISOString()}] Failed to parse homework help:`, parseError);
         // Return a default structure matching the expected format
@@ -995,13 +1036,13 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: "You are an AI that creates educational study materials. Always respond in valid JSON format with introduction, summary, flashcards array, and quiz array."
+            content: "You are an AI that creates educational study materials. You MUST respond in valid JSON format with an introduction, summary, flashcards array, and quiz array. Do not include any additional text outside of the JSON object. Your response should be ONLY a valid JSON object with no markdown formatting."
           }, {
             role: "user",
             content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
           }],
           max_tokens: 4096,
-          stream: true  // Make sure this is present
+          stream: true
         })
       );
 
@@ -1012,9 +1053,15 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
 
       let studyMaterials;
       try {
-        // With response_format: json_object, we can parse directly
-        studyMaterials = JSON.parse(studyMaterialsResponse);
-        console.log(`[${new Date().toISOString()}] Successfully parsed JSON response`);
+        // First try to get a valid JSON response
+        if (studyMaterialsResponse.trim().startsWith('{') && studyMaterialsResponse.trim().endsWith('}')) {
+          studyMaterials = JSON.parse(studyMaterialsResponse);
+          console.log(`[${new Date().toISOString()}] Successfully parsed JSON response`);
+        } else {
+          // Force a more structured prompt to get proper JSON
+          console.log(`[${new Date().toISOString()}] Response is not valid JSON, generating structured fallback`);
+          throw new Error("Not valid JSON");
+        }
       } catch (parseError) {
         console.error(`[${new Date().toISOString()}] Failed direct JSON parse, attempting extraction:`, parseError);
         
@@ -1033,6 +1080,10 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
           }
         } catch (extractError) {
           console.error(`[${new Date().toISOString()}] Failed to extract JSON:`, extractError);
+          
+          // Use the fallback approach more aggressively
+          console.log(`[${new Date().toISOString()}] Using basic fallback structure for study materials`);
+          
           // Provide a basic fallback structure
           studyMaterials = {
             introduction: "I analyzed your content. Here's some material to help you master this subject.",
@@ -1040,6 +1091,9 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
             flashcards: [],
             quiz: []
           };
+          
+          // Set flag to immediately trigger fallback content generation
+          needsFallback = true;
         }
       }
 
@@ -1194,6 +1248,103 @@ Provide ONE additional hint that gives more guidance without revealing the full 
   } catch (error) {
     console.error('[Server] Error generating additional hint:', error);
     res.status(500).json({ error: 'Failed to generate additional hint' });
+  }
+});
+
+// Chat endpoint - updated with improved educational prompt
+app.post('/chat', async (req, res) => {
+  try {
+    const { message, sessionId, contentId, contentType, contentContext, messageHistory } = req.body;
+    
+    console.log(`[Server] Chat request received:`, {
+      messagePreview: message.substring(0, 50),
+      contentType,
+      hasContext: !!contentContext,
+      contentTitle: contentContext?.title,
+      messageHistoryLength: messageHistory?.length
+    });
+    
+    if (!message || !sessionId || !contentId || !contentType || !contentContext) {
+      console.error('[Server] Missing parameters:', { 
+        hasMessage: !!message, 
+        hasSessionId: !!sessionId,
+        hasContentId: !!contentId,
+        hasContentType: !!contentType,
+        hasContext: !!contentContext 
+      });
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    // Format the content context for the AI
+    let formattedContext = '';
+    if (contentType === 'study-set') {
+      formattedContext = `
+STUDY MATERIAL: "${contentContext.title}"
+
+FULL CONTENT:
+${contentContext.text_content.raw_text}
+
+${contentContext.summary ? `SUMMARY:
+${contentContext.summary}` : ''}
+
+${contentContext.flashcards ? `KEY CONCEPTS:
+${contentContext.flashcards.map(card => `- ${card.front}: ${card.back}`).join('\n')}` : ''}
+      `;
+    } else if (contentType === 'homework-help') {
+      formattedContext = `
+HOMEWORK PROBLEM: "${contentContext.title}"
+
+PROBLEM SUMMARY:
+${contentContext.homeworkHelp.problem_summary || contentContext.text_content.raw_text}
+
+${contentContext.homeworkHelp.approach_guidance ? `APPROACH GUIDANCE:
+${contentContext.homeworkHelp.approach_guidance}` : ''}
+
+${contentContext.homeworkHelp.concept_cards ? `KEY CONCEPTS:
+${contentContext.homeworkHelp.concept_cards.map(card => `- ${card.title}: ${card.explanation}`).join('\n')}` : ''}
+      `;
+    }
+    
+    // Build the conversation with context and history
+    const conversation = [
+      {
+        role: "system",
+        content: lexieTutorPrompt
+      },
+      {
+        role: "system",
+        content: `You are helping with this specific content:\n\n${formattedContext}`
+      },
+      // Include previous messages
+      ...(messageHistory || []),
+      {
+        role: "user",
+        content: message
+      }
+    ];
+    
+    // Get response from OpenAI
+    const chatResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: conversation,
+      max_tokens: 1024,
+      temperature: 0.7
+    });
+    
+    const responseText = chatResponse.choices[0].message.content.trim();
+    
+    console.log(`[${new Date().toISOString()}] Chat response generated`);
+    
+    res.json({
+      response: responseText
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Chat error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to process chat message',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
