@@ -1,81 +1,59 @@
-module.exports = `Analyze the transcribed educational content and determine if it's textbook material or a problem/assignment. Return ONLY a JSON response.
+module.exports = `CONTENT CLASSIFICATION TASK:
 
-## Content Type Definitions
+You are analyzing educational content and must determine if it's:
 
-TEXTBOOK_MATERIAL:
-* Contains multiple concepts or comprehensive topic coverage
-* Has structured organization with explanatory headings and sections
-* Primarily consists of explanatory content teaching concepts
-* Contains multiple definition patterns: "X is defined as", "X refers to"
-* Offers theoretical background before any examples
-* Uses mostly declarative sentences explaining concepts
-* Contains minimal or no questions requiring the reader to solve
+1. PROBLEM_ASSIGNMENT: Content primarily focused on problems for a student to solve
+2. TEXTBOOK_MATERIAL: Content primarily focused on teaching concepts, which may include some exercises
 
-PROBLEM_ASSIGNMENT:
-* Contains specific tasks that require solutions or answers
-* Has blank spaces, underscores, or boxes for writing answers
-* Uses imperative language: "solve", "find", "calculate", "determine"
-* Contains question marks or numbered problems
-* Contains specific values to use in calculations
-* Includes phrases like "exercise", "problem", "assignment", "solve", "calculate"
-* Often contains fill-in-the-blank sections or answer spaces
+CRITICAL DISTINCTION:
+- Focus on the PRIMARY PURPOSE of the content, not individual elements
+- Textbooks often include exercise sections but are still TEXTBOOK_MATERIAL
+- A section called "Tehtävät" or "Exercises" at the end of a chapter does NOT make the entire content a PROBLEM_ASSIGNMENT
 
-## High-Priority Assignment Indicators
+PROBLEM_ASSIGNMENT characteristics (MUST HAVE MAJORITY of these):
+- The MAJORITY of the content consists of problems to solve
+- The content begins directly with questions or problems
+- Each section primarily asks the student to calculate, solve, or determine something
+- The content has minimal explanatory text compared to exercise content
+- The content is structured as a worksheet or assignment rather than teaching material
+- The content appears to be specifically created as homework or classwork
 
-These indicators STRONGLY suggest PROBLEM_ASSIGNMENT classification:
-* Empty spaces or lines for answers (like "V: ___ henkilöä")
-* Instructions to calculate, determine, or find values
-* Multiple blanks or spaces for filling in answers
-* Questions asking "how many" or "what is"
-* Tables or sections where answers should be written
-* Multiple calculation-based questions organized in sequence
-* Instructions in second-person ("you need to find...")
-* Fill-in-the-blank sections, especially with underscores
+TEXTBOOK_MATERIAL characteristics (classify this way if MAJORITY applies):
+- The content primarily explains concepts, theories, or information
+- Explanatory content makes up most of the document
+- Any exercises appear at the end of sections or chapters
+- Content includes definitions, examples, and detailed explanations
+- Content has a structured flow of information building on previous concepts
+- If exercises exist, they serve to reinforce the material just taught
 
-## High-Priority Textbook Indicators
+EXAMPLES of TEXTBOOK_MATERIAL with exercises:
+- A biology chapter explaining cell structure with a few questions at the end
+- A language textbook with vocabulary lists and practice exercises
+- A history text describing events with reflection questions afterward
+- A physics textbook explaining concepts with example problems and exercises
+- A math textbook with theory followed by practice problems
 
-These indicators STRONGLY suggest TEXTBOOK_MATERIAL classification:
-* Multiple pages of explanatory text without questions
-* Clear chapter/section structure with headings and subheadings
-* Historical development of concepts without requesting solutions
-* Multiple interconnected concepts explained in sequence
-* Learning objectives or curriculum standards listed
-* Review sections summarizing previously explained content
+EXAMPLES of PROBLEM_ASSIGNMENT:
+- A worksheet with 10 math problems to solve
+- A sheet with language translation exercises with minimal instruction
+- A take-home lab assignment with specific questions to answer
+- A problem set asking students to apply previously learned concepts
 
-## Language-Specific Considerations
+SPECIAL CASE FOR VOCABULARY LISTS:
+- Content focused on vocabulary pairs (e.g., French-Finnish word lists) should be classified as TEXTBOOK_MATERIAL
+- Language exercises with vocabulary tables are typically TEXTBOOK_MATERIAL
 
-Finnish/Swedish assignments often:
-* Contain words like "laske", "määritä", "kuinka monta", "tehtävä", "lasku"
-* Have answer spaces marked with lines or "V: ___" format
-* Use imperative verbs at the beginning of sentences
-
-## Decision Algorithm
-
-1. First, check for high-priority assignment indicators:
-   * If content has blank spaces for answers → PROBLEM_ASSIGNMENT
-   * If content directly asks to calculate values → PROBLEM_ASSIGNMENT
-   * If content contains sections with "V:", "Answer:", etc. → PROBLEM_ASSIGNMENT
-
-2. If no clear high-priority indicators, check content ratio:
-   * If >70% of content consists of questions/problems → PROBLEM_ASSIGNMENT
-   * If >70% of content consists of explanations → TEXTBOOK_MATERIAL
-
-3. For mixed content:
-   * If explanations are followed by specific tasks → PROBLEM_ASSIGNMENT
-   * If examples are provided to illustrate concepts without requiring answers → TEXTBOOK_MATERIAL
-
-JSON Response Format:
+Your response must be EXACTLY this JSON structure with NO additional text:
 {
-  "classification": "TEXTBOOK_MATERIAL | PROBLEM_ASSIGNMENT",
-  "confidence": "HIGH | MEDIUM | LOW",
-  "primary_indicators": ["List the 2-3 most decisive patterns found in the content"],
-  "processing_approach": "Textbook Content Processing | Problem Assistance"
+  "classification": "PROBLEM_ASSIGNMENT",
+  "confidence": "HIGH",
+  "subject_area": "Math",
+  "language": "English",
+  "processing_approach": "Problem Assistance"
 }
 
-Critical Rules:
-* The presence of ANY answer lines (like "V: ___") ALWAYS indicates PROBLEM_ASSIGNMENT
-* Content with calculations to perform is almost always PROBLEM_ASSIGNMENT
-* Brief explanations followed by questions is PROBLEM_ASSIGNMENT
-* When truly uncertain, default to PROBLEM_ASSIGNMENT
-* Finnish math assignments often have the format "XXX V: ___ henkilöä" - ALWAYS classify these as PROBLEM_ASSIGNMENT
-* Return ONLY valid JSON with no additional text or explanations`; 
+IMPORTANT:
+1. Use ONLY the exact values specified above
+2. NO additional text before or after the JSON
+3. NO markdown formatting or backticks
+4. ALL strings must use double quotes (")`; 

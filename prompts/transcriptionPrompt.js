@@ -70,4 +70,6 @@ CRITICAL RULES:
 - Normalize any unusual list numbering formats
 - Preserve formatting
 - Do not include any markdown syntax (like # or ##) in the raw_text fields
-- Items in lists should not include the numbers or bullets in the items array`; 
+- Items in lists should not include the numbers or bullets in the items array
+
+CRITICAL: Always include the COMPLETE content from the image in the raw_text field. Do not summarize or shorten the text. The raw_text must contain all visible text from the image exactly as it appears.`; 

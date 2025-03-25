@@ -180,6 +180,9 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
         openai.chat.completions.create({
           model: "gpt-4o",
           messages: [{
+            role: "system",
+            content: "You are a transcription assistant that MUST return ONLY valid JSON. Never include any text before or after the JSON object. Ensure all special characters are properly escaped."
+          }, {
             role: "user",
             content: [{
               type: "text",
@@ -205,24 +208,60 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
     const transcriptions = transcriptionResponses.map(resp => {
       try {
         const content = resp.choices[0].message.content;
-        // Clean up any markdown or extra characters
-        const cleanContent = content
-          .replace(/^```json\s*/, '')  // Remove opening ```json
-          .replace(/\s*```$/, '')      // Remove closing ```
-          .trim();
-
+        
+        // Improved JSON extraction using regex pattern
+        const jsonPattern = /{[\s\S]*}/g; // Match everything between { and } including newlines
+        const jsonMatches = content.match(jsonPattern);
+        
+        if (!jsonMatches || jsonMatches.length === 0) {
+          console.error('[Server] No valid JSON found in response:', content.substring(0, 200) + '...');
+          throw new Error('No valid JSON found in response');
+        }
+        
+        // Take the largest JSON match (most likely the complete one)
+        const largestMatch = jsonMatches.reduce((a, b) => a.length > b.length ? a : b);
+        
         try {
-          return JSON.parse(cleanContent);
-        } catch (parseError) {
-          console.error('[Server] JSON parse error:', parseError);
-          console.error('[Server] Content that failed to parse:', cleanContent);
-          throw new Error('Failed to parse transcription response');
+          return JSON.parse(largestMatch);
+        } catch (innerParseError) {
+          console.error('[Server] Inner JSON parse error:', innerParseError);
+          
+          // Try more aggressive cleaning
+          const cleanedJson = largestMatch
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+            .replace(/\\[^"\\\/bfnrtu]/g, '\\\\$&'); // Fix improperly escaped backslashes
+          
+          try {
+            return JSON.parse(cleanedJson);
+          } catch (lastAttemptError) {
+            console.error('[Server] Failed final JSON parse attempt for content:', largestMatch.substring(0, 200) + '...');
+            throw new Error('Failed to parse transcription after multiple attempts');
+          }
         }
       } catch (error) {
         console.error('[Server] Transcription processing error:', error);
-        throw error;
+        
+        // Return a minimal valid object to prevent the entire process from failing
+        return {
+          title: "Untitled Content",
+          text_content: {
+            raw_text: "There was an error processing this portion of the content.",
+            sections: [
+              {
+                type: "paragraph",
+                raw_text: "There was an error processing this portion of the content."
+              }
+            ]
+          }
+        };
       }
     });
+
+    // Also add this backup mechanism right after the above code
+    if (transcriptions.length === 0) {
+      console.error('[Server] No valid transcriptions were produced');
+      throw new Error('No valid transcriptions were produced');
+    }
 
     // Combine transcriptions
     const combinedTranscription = {
@@ -267,20 +306,20 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
         .replace(/\s*```$/i, '')      // Remove closing ```
         .trim();
         
-      console.log(`[${new Date().toISOString()}] Cleaned classification result for parsing`);
-      
-      // Add validation check for JSON structure
-      if (cleanedResult.startsWith('{') && cleanedResult.endsWith('}')) {
-        const parsedClassification = JSON.parse(cleanedResult);
-        classification = {
-          ...classification, // Maintain defaults
-          ...parsedClassification // Override with parsed values
-        };
-        console.log(`[${new Date().toISOString()}] Content classified as: ${classification.classification} (${classification.subject_area})`);
-      } else {
-        console.log(`[${new Date().toISOString()}] Classification result is not valid JSON, using defaults`);
-        // Use default values, already set above
-      }
+        console.log(`[${new Date().toISOString()}] Cleaned classification result for parsing`);
+        
+        // Add validation check for JSON structure
+        if (cleanedResult.startsWith('{') && cleanedResult.endsWith('}')) {
+          const parsedClassification = JSON.parse(cleanedResult);
+          classification = {
+            ...classification, // Maintain defaults
+            ...parsedClassification // Override with parsed values
+          };
+          console.log(`[${new Date().toISOString()}] Content classified as: ${classification.classification} (${classification.subject_area})`);
+        } else {
+          console.log(`[${new Date().toISOString()}] Classification result is not valid JSON, using defaults`);
+          // Use default values, already set above
+        }
     } catch (parseError) {
       console.error('[Server] Classification parse error:', parseError);
       console.error('[Server] Content that failed to parse:', classificationResult);
@@ -288,18 +327,11 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
       console.log(`[${new Date().toISOString()}] Using default classification due to parse error`);
     }
 
-    // NEW: Analyze text to determine if it's more likely to be study material
-    const hasDefinitions = combinedTranscription.text_content.raw_text.match(/definition|is defined as|refers to|means/gi);
-    const hasMultipleTopics = combinedTranscription.text_content.raw_text.split('\n\n').length > 3;
-    const hasProblemIndicators = combinedTranscription.text_content.raw_text.match(/solve|calculate|find the|problem|exercise/gi);
-
-    // Override classification if text analysis strongly suggests it's study material
-    if ((hasDefinitions || hasMultipleTopics) && !hasProblemIndicators) {
-      if (classification.classification !== "TEXTBOOK_MATERIAL") {
-        console.log(`[${new Date().toISOString()}] Overriding classification to TEXTBOOK_MATERIAL based on content analysis`);
-        classification.classification = "TEXTBOOK_MATERIAL";
-        classification.processing_approach = "Textbook Content Processing";
-      }
+    // Keep ONLY this simple Finnish language detection
+    const hasFinnishCharacters = /[äöåÄÖÅ]/.test(combinedTranscription.text_content.raw_text);
+    if (hasFinnishCharacters && classification.language !== "Finnish") {
+      console.log(`[${new Date().toISOString()}] Finnish characters detected, updating language`);
+      classification.language = "Finnish";
     }
 
     let result;
@@ -369,9 +401,15 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
         `${homeworkHelp.concept_cards.length} cards` : 
         'No cards generated');
 
+      // Keep this validation after parsing the response:
+      if (!homeworkHelp.problem_summary || homeworkHelp.problem_summary.length < combinedTranscription.text_content.raw_text.length * 0.5) {
+        console.log(`[${new Date().toISOString()}] Problem summary seems incomplete, adding full transcription`);
+        homeworkHelp.problem_summary = combinedTranscription.text_content.raw_text;
+      }
+
       // Return homework help result
       primaryResult = {
-        title: combinedTranscription.title,
+        title: homeworkHelp.title || combinedTranscription.title.replace(" - DRAFT ONLY", ""),
         text_content: combinedTranscription.text_content,
         contentType: 'homework-help',
         introduction: `I analyzed your ${classification.subject_area} problem. Here's some help to guide you through the solution.`,
@@ -396,7 +434,7 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: "You are an AI that creates educational study materials. You MUST respond in valid JSON format with an introduction, summary, flashcards array, and quiz array. Do not include any additional text outside of the JSON object. Your response should be ONLY a valid JSON object with no markdown formatting."
+            content: "You are an AI that creates educational study materials. You MUST respond in valid JSON format with an introduction, summary, flashcards array, and quiz array. Preserve all special characters and use UTF-8 encoding."
           }, {
             role: "user",
             content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
@@ -413,48 +451,38 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
 
       let studyMaterials;
       try {
-        // First try to get a valid JSON response
-        if (studyMaterialsResponse.trim().startsWith('{') && studyMaterialsResponse.trim().endsWith('}')) {
-          studyMaterials = JSON.parse(studyMaterialsResponse);
-          console.log(`[${new Date().toISOString()}] Successfully parsed JSON response`);
-        } else {
-          // Force a more structured prompt to get proper JSON
-          console.log(`[${new Date().toISOString()}] Response is not valid JSON, generating structured fallback`);
-          throw new Error("Not valid JSON");
-        }
-      } catch (parseError) {
-        console.error(`[${new Date().toISOString()}] Failed direct JSON parse, attempting extraction:`, parseError);
+        // Add error logging
+        console.log('[Server] Raw response preview:', studyMaterialsResponse.substring(0, 500));
         
-        try {
-          // Try to extract JSON using regex for better matching
-          const jsonRegex = /{(?:[^{}]|{(?:[^{}]|{[^{}]*})*})*}/g;
-          const matches = studyMaterialsResponse.match(jsonRegex);
+        const cleanedResponse = studyMaterialsResponse
+          .trim()
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/\s*```$/i, '')
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
           
-          if (matches && matches.length > 0) {
-            // Use the largest match as it's likely the complete structure
-            const largestMatch = matches.reduce((a, b) => a.length > b.length ? a : b);
-            studyMaterials = JSON.parse(largestMatch);
-            console.log(`[${new Date().toISOString()}] Extracted JSON using regex`);
-          } else {
-            throw new Error("No JSON structure found in response");
-          }
-        } catch (extractError) {
-          console.error(`[${new Date().toISOString()}] Failed to extract JSON:`, extractError);
-          
-          // Use the fallback approach more aggressively
-          console.log(`[${new Date().toISOString()}] Using basic fallback structure for study materials`);
-          
-          // Provide a basic fallback structure
-          studyMaterials = {
-            introduction: "I analyzed your content. Here's some material to help you master this subject.",
-            summary: "",
-            flashcards: [],
-            quiz: []
-          };
-          
-          // Set flag to immediately trigger fallback content generation
-          needsFallback = true;
+        studyMaterials = JSON.parse(cleanedResponse);
+        
+        // Always use the transcription title
+        studyMaterials.title = combinedTranscription.title;
+        console.log('[Server] Using transcription title:', studyMaterials.title);
+        
+        // Validate other required fields
+        if (!studyMaterials.summary || typeof studyMaterials.summary !== 'string') {
+          throw new Error('Missing or invalid summary in study materials response');
         }
+        
+        if (!Array.isArray(studyMaterials.flashcards) || !Array.isArray(studyMaterials.quiz)) {
+          throw new Error('Missing or invalid flashcards/quiz arrays in response');
+        }
+        
+        // Log successful parse
+        console.log('[Server] Successfully parsed study materials response');
+        
+      } catch (parseError) {
+        console.error('[Server] Parse error:', parseError);
+        console.error('[Server] Failed content:', studyMaterialsResponse);
+        throw new Error('Failed to parse study materials response');
       }
 
       // Normalize quiz data structure
@@ -469,7 +497,7 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
 
       // Return study materials result
       primaryResult = {
-        title: combinedTranscription.title,
+        title: studyMaterials.title || combinedTranscription.title,
         text_content: combinedTranscription.text_content,
         contentType: 'study-set',
         introduction: studyMaterials.introduction || 'I analyzed your content. Here\'s some material to help you master this subject.',
@@ -585,6 +613,22 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
     const totalTime = Date.now() - startTime;
     console.log(`[${new Date().toISOString()}] Analysis completed in ${totalTime}ms`);
     
+    // Make sure the original text is always preserved somewhere accessible in the response
+    if (!result.text_content || !result.text_content.raw_text) {
+      console.log(`[${new Date().toISOString()}] Adding missing text_content from transcription`);
+      result.text_content = combinedTranscription.text_content;
+    }
+
+    // If it's a study set but might actually be a homework problem
+    if (result.contentType === 'study-set' && 
+        (combinedTranscription.text_content.raw_text.includes('?') || 
+         combinedTranscription.text_content.raw_text.length < 500)) {
+      console.log(`[${new Date().toISOString()}] Possible misclassified content detected`);
+      // Store original text in a separate field instead of modifying the summary
+      result.original_text = combinedTranscription.text_content.raw_text;
+      result.possible_misclassification = true;
+    }
+
     res.json(result);
 
   } catch (error) {
@@ -822,6 +866,9 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         openai.chat.completions.create({
           model: "gpt-4o",
           messages: [{
+            role: "system",
+            content: "You are a transcription assistant that MUST return ONLY valid JSON. Never include any text before or after the JSON object. Ensure all special characters are properly escaped."
+          }, {
             role: "user",
             content: [{
               type: "text",
@@ -931,14 +978,21 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
       console.log(`[${new Date().toISOString()}] Using default classification due to parse error`);
     }
 
-    // Generate appropriate homework help based on classification
-    updateProcessingStatus(processingId, 'generating');
-    console.log(`[${new Date().toISOString()}] Generating assistance...`);
+    // Keep ONLY this simple Finnish language detection
+    const hasFinnishCharacters = /[äöåÄÖÅ]/.test(combinedTranscription.text_content.raw_text);
+    if (hasFinnishCharacters && classification.language !== "Finnish") {
+      console.log(`[${new Date().toISOString()}] Finnish characters detected, updating language`);
+      classification.language = "Finnish";
+    }
 
-    // Only use homework help prompt for PROBLEM_ASSIGNMENT
-    if (classification.processing_approach === "Problem Assistance") {
+    let result;
+    let primaryResult;
+
+    // STEP 3: BRANCH BASED ON CLASSIFICATION
+    if (classification.classification === "PROBLEM_ASSIGNMENT") {
       console.log(`[${new Date().toISOString()}] Using problem assistance approach`);
       
+      // STEP 3A: HOMEWORK HELP PATH
       const homeworkHelpResponse = await makeRequestWithRetry(() => 
         openai.chat.completions.create({
           model: "gpt-4o",
@@ -956,17 +1010,13 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         homeworkHelpContent += chunk.choices[0]?.delta?.content || '';
       }
 
-      // Parse homework help response
-      console.log(`[${new Date().toISOString()}] Parsing homework help response`);
-
-      // Extract JSON from the response
+      // Parse homework help
       let jsonContent = homeworkHelpContent;
       const startIndex = homeworkHelpContent.indexOf('{');
       const endIndex = homeworkHelpContent.lastIndexOf('}') + 1;
 
       if (startIndex >= 0 && endIndex > startIndex) {
         jsonContent = homeworkHelpContent.substring(startIndex, endIndex);
-        console.log(`[${new Date().toISOString()}] Extracted JSON content from response`);
       }
 
       let homeworkHelp;
@@ -1002,9 +1052,15 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         `${homeworkHelp.concept_cards.length} cards` : 
         'No cards generated');
 
-      // Combine results (integrating with existing data structure)
-      const result = {
-        title: combinedTranscription.title,
+      // Keep this validation after parsing the response:
+      if (!homeworkHelp.problem_summary || homeworkHelp.problem_summary.length < combinedTranscription.text_content.raw_text.length * 0.5) {
+        console.log(`[${new Date().toISOString()}] Problem summary seems incomplete, adding full transcription`);
+        homeworkHelp.problem_summary = combinedTranscription.text_content.raw_text;
+      }
+
+      // Return homework help result
+      primaryResult = {
+        title: homeworkHelp.title || combinedTranscription.title.replace(" - DRAFT ONLY", ""),
         text_content: combinedTranscription.text_content,
         contentType: 'homework-help',
         introduction: `I analyzed your ${classification.subject_area} problem. Here's some help to guide you through the solution.`,
@@ -1019,24 +1075,17 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         created_at: Date.now(),
         updated_at: Date.now()
       };
-
-      // Before sending the response, store the full result
-      updateProcessingStatus(processingId, 'completed', result);
-
-      // Then send the response
-      res.json(result);
-    } else {
-      // For textbook content, use a different approach (study materials generation)
-      console.log(`[${new Date().toISOString()}] Using textbook content processing approach`);
       
-      // Generate study materials from combined text
-      console.log(`[${new Date().toISOString()}] Generating study materials...`);
+    } else {
+      console.log(`[${new Date().toISOString()}] Using study materials approach`);
+      
+      // STEP 3B: STUDY MATERIALS PATH
       const stream = await makeRequestWithRetry(() => 
         openai.chat.completions.create({
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: "You are an AI that creates educational study materials. You MUST respond in valid JSON format with an introduction, summary, flashcards array, and quiz array. Do not include any additional text outside of the JSON object. Your response should be ONLY a valid JSON object with no markdown formatting."
+            content: "You are an AI that creates educational study materials. You MUST respond in valid JSON format with an introduction, summary, flashcards array, and quiz array. Preserve all special characters and use UTF-8 encoding."
           }, {
             role: "user",
             content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
@@ -1053,48 +1102,38 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
 
       let studyMaterials;
       try {
-        // First try to get a valid JSON response
-        if (studyMaterialsResponse.trim().startsWith('{') && studyMaterialsResponse.trim().endsWith('}')) {
-          studyMaterials = JSON.parse(studyMaterialsResponse);
-          console.log(`[${new Date().toISOString()}] Successfully parsed JSON response`);
-        } else {
-          // Force a more structured prompt to get proper JSON
-          console.log(`[${new Date().toISOString()}] Response is not valid JSON, generating structured fallback`);
-          throw new Error("Not valid JSON");
-        }
-      } catch (parseError) {
-        console.error(`[${new Date().toISOString()}] Failed direct JSON parse, attempting extraction:`, parseError);
+        // Add error logging
+        console.log('[Server] Raw response preview:', studyMaterialsResponse.substring(0, 500));
         
-        try {
-          // Try to extract JSON using regex for better matching
-          const jsonRegex = /{(?:[^{}]|{(?:[^{}]|{[^{}]*})*})*}/g;
-          const matches = studyMaterialsResponse.match(jsonRegex);
+        const cleanedResponse = studyMaterialsResponse
+          .trim()
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/\s*```$/i, '')
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
           
-          if (matches && matches.length > 0) {
-            // Use the largest match as it's likely the complete structure
-            const largestMatch = matches.reduce((a, b) => a.length > b.length ? a : b);
-            studyMaterials = JSON.parse(largestMatch);
-            console.log(`[${new Date().toISOString()}] Extracted JSON using regex`);
-          } else {
-            throw new Error("No JSON structure found in response");
-          }
-        } catch (extractError) {
-          console.error(`[${new Date().toISOString()}] Failed to extract JSON:`, extractError);
-          
-          // Use the fallback approach more aggressively
-          console.log(`[${new Date().toISOString()}] Using basic fallback structure for study materials`);
-          
-          // Provide a basic fallback structure
-          studyMaterials = {
-            introduction: "I analyzed your content. Here's some material to help you master this subject.",
-            summary: "",
-            flashcards: [],
-            quiz: []
-          };
-          
-          // Set flag to immediately trigger fallback content generation
-          needsFallback = true;
+        studyMaterials = JSON.parse(cleanedResponse);
+        
+        // Always use the transcription title
+        studyMaterials.title = combinedTranscription.title;
+        console.log('[Server] Using transcription title:', studyMaterials.title);
+        
+        // Validate other required fields
+        if (!studyMaterials.summary || typeof studyMaterials.summary !== 'string') {
+          throw new Error('Missing or invalid summary in study materials response');
         }
+        
+        if (!Array.isArray(studyMaterials.flashcards) || !Array.isArray(studyMaterials.quiz)) {
+          throw new Error('Missing or invalid flashcards/quiz arrays in response');
+        }
+        
+        // Log successful parse
+        console.log('[Server] Successfully parsed study materials response');
+        
+      } catch (parseError) {
+        console.error('[Server] Parse error:', parseError);
+        console.error('[Server] Failed content:', studyMaterialsResponse);
+        throw new Error('Failed to parse study materials response');
       }
 
       // Normalize quiz data structure

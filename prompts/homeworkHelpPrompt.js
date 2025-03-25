@@ -48,7 +48,7 @@ Include the complete transcribed assignment text from the image, with these form
    * Add extra line breaks between different sections for better visual separation
 
 3. Approach Guidance (2-3 simple sentences)
-Create a section titled "How to approach" (or "Tee näin" for Finnish content) that provides a clear strategy for solving the problem:
+Create a section titled "How to approach" that provides a clear strategy for solving the problem:
 * Break the solution process into 2-3 specific, actionable steps
 * Connect directly to the elements in the student's specific problem
 * Use words and examples that an 8-year-old would understand
@@ -130,6 +130,7 @@ Structure your response in this JSON format:
   "language": "LANGUAGE_CODE",
   "problem_type": "calculation|conceptual|language|simple",
   "introduction": "Brief introduction to the problem",
+  "title": "Clear, descriptive assignment title",
   "problem_summary": "The full transcribed problem text from the image, formatted with proper line breaks but WITHOUT answer lines",
   "approach_guidance": "Brief explanation of the approach in SIMPLE language a 10-year-old would understand",
   "concept_cards": [
