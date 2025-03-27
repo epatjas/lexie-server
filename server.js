@@ -434,7 +434,23 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: "You are an AI that creates educational study materials. You MUST respond in valid JSON format with an introduction, summary, flashcards array, and quiz array. Preserve all special characters and use UTF-8 encoding."
+            content: `You are an AI that creates educational study materials. You MUST return a JSON object with EXACTLY these fields:
+{
+  "title": "string",
+  "text_content": {
+    "raw_text": "string",
+    "sections": []
+  },
+  "introduction": "string",
+  "summary": "string",
+  "flashcards": [{"front": "string", "back": "string"}],
+  "quiz": [{
+    "question": "string",
+    "options": ["string"],
+    "correct": "string",
+    "explanation": "string"
+  }]
+}`
           }, {
             role: "user",
             content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
@@ -459,30 +475,49 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
           .replace(/^```json\s*/i, '')
           .replace(/^```\s*/i, '')
           .replace(/\s*```$/i, '')
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
-          
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+          .trim();
+
         studyMaterials = JSON.parse(cleanedResponse);
         
-        // Always use the transcription title
-        studyMaterials.title = combinedTranscription.title;
-        console.log('[Server] Using transcription title:', studyMaterials.title);
-        
-        // Validate other required fields
-        if (!studyMaterials.summary || typeof studyMaterials.summary !== 'string') {
-          throw new Error('Missing or invalid summary in study materials response');
-        }
-        
-        if (!Array.isArray(studyMaterials.flashcards) || !Array.isArray(studyMaterials.quiz)) {
-          throw new Error('Missing or invalid flashcards/quiz arrays in response');
-        }
-        
-        // Log successful parse
-        console.log('[Server] Successfully parsed study materials response');
-        
+        // Transform the response to match expected format
+        studyMaterials = {
+          title: studyMaterials.title || combinedTranscription.title || 'Untitled Study Set',
+          text_content: studyMaterials.text_content || combinedTranscription.text_content,
+          introduction: studyMaterials.introduction || 'Let\'s study this material together.',
+          summary: studyMaterials.summary || studyMaterials.text_summary || combinedTranscription.text_content.raw_text,
+          flashcards: Array.isArray(studyMaterials.flashcards) ? studyMaterials.flashcards : [],
+          quiz: Array.isArray(studyMaterials.quiz) ? studyMaterials.quiz : [],
+          vocabulary_tables: Array.isArray(studyMaterials.vocabulary_tables) ? studyMaterials.vocabulary_tables : [],
+          subject_area: studyMaterials.subject_area || classification.subject_area || 'GENERAL'
+        };
+
+        // Validate the structure
+        console.log('[Server] Parsed study materials structure:', {
+          hasTitle: !!studyMaterials.title,
+          hasTextContent: !!studyMaterials.text_content,
+          hasSummary: !!studyMaterials.summary,
+          flashcardsCount: studyMaterials.flashcards.length,
+          quizCount: studyMaterials.quiz.length
+        });
+
       } catch (parseError) {
         console.error('[Server] Parse error:', parseError);
         console.error('[Server] Failed content:', studyMaterialsResponse);
-        throw new Error('Failed to parse study materials response');
+        
+        // Create a fallback response
+        studyMaterials = {
+          title: combinedTranscription.title || 'Untitled Study Set',
+          text_content: combinedTranscription.text_content,
+          introduction: 'Here are your study materials.',
+          summary: combinedTranscription.text_content.raw_text,
+          flashcards: [],
+          quiz: [],
+          vocabulary_tables: [],
+          subject_area: classification.subject_area || 'GENERAL'
+        };
+        
+        console.log('[Server] Using fallback study materials structure');
       }
 
       // Normalize quiz data structure
@@ -502,8 +537,10 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
         contentType: 'study-set',
         introduction: studyMaterials.introduction || 'I analyzed your content. Here\'s some material to help you master this subject.',
         summary: studyMaterials.summary || '',
+        subject_area: studyMaterials.subject_area || classification.subject_area || 'GENERAL',
         flashcards: studyMaterials.flashcards || [],
         quiz: normalizedQuiz,
+        vocabulary_tables: studyMaterials.vocabulary_tables || [],
         created_at: Date.now(),
         updated_at: Date.now(),
         processingId
@@ -1085,7 +1122,23 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: "You are an AI that creates educational study materials. You MUST respond in valid JSON format with an introduction, summary, flashcards array, and quiz array. Preserve all special characters and use UTF-8 encoding."
+            content: `You are an AI that creates educational study materials. You MUST return a JSON object with EXACTLY these fields:
+{
+  "title": "string",
+  "text_content": {
+    "raw_text": "string",
+    "sections": []
+  },
+  "introduction": "string",
+  "summary": "string",
+  "flashcards": [{"front": "string", "back": "string"}],
+  "quiz": [{
+    "question": "string",
+    "options": ["string"],
+    "correct": "string",
+    "explanation": "string"
+  }]
+}`
           }, {
             role: "user",
             content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
@@ -1110,30 +1163,49 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
           .replace(/^```json\s*/i, '')
           .replace(/^```\s*/i, '')
           .replace(/\s*```$/i, '')
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
-          
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+          .trim();
+
         studyMaterials = JSON.parse(cleanedResponse);
         
-        // Always use the transcription title
-        studyMaterials.title = combinedTranscription.title;
-        console.log('[Server] Using transcription title:', studyMaterials.title);
-        
-        // Validate other required fields
-        if (!studyMaterials.summary || typeof studyMaterials.summary !== 'string') {
-          throw new Error('Missing or invalid summary in study materials response');
-        }
-        
-        if (!Array.isArray(studyMaterials.flashcards) || !Array.isArray(studyMaterials.quiz)) {
-          throw new Error('Missing or invalid flashcards/quiz arrays in response');
-        }
-        
-        // Log successful parse
-        console.log('[Server] Successfully parsed study materials response');
-        
+        // Transform the response to match expected format
+        studyMaterials = {
+          title: studyMaterials.title || combinedTranscription.title || 'Untitled Study Set',
+          text_content: studyMaterials.text_content || combinedTranscription.text_content,
+          introduction: studyMaterials.introduction || 'Let\'s study this material together.',
+          summary: studyMaterials.summary || studyMaterials.text_summary || combinedTranscription.text_content.raw_text,
+          flashcards: Array.isArray(studyMaterials.flashcards) ? studyMaterials.flashcards : [],
+          quiz: Array.isArray(studyMaterials.quiz) ? studyMaterials.quiz : [],
+          vocabulary_tables: Array.isArray(studyMaterials.vocabulary_tables) ? studyMaterials.vocabulary_tables : [],
+          subject_area: studyMaterials.subject_area || classification.subject_area || 'GENERAL'
+        };
+
+        // Validate the structure
+        console.log('[Server] Parsed study materials structure:', {
+          hasTitle: !!studyMaterials.title,
+          hasTextContent: !!studyMaterials.text_content,
+          hasSummary: !!studyMaterials.summary,
+          flashcardsCount: studyMaterials.flashcards.length,
+          quizCount: studyMaterials.quiz.length
+        });
+
       } catch (parseError) {
         console.error('[Server] Parse error:', parseError);
         console.error('[Server] Failed content:', studyMaterialsResponse);
-        throw new Error('Failed to parse study materials response');
+        
+        // Create a fallback response
+        studyMaterials = {
+          title: combinedTranscription.title || 'Untitled Study Set',
+          text_content: combinedTranscription.text_content,
+          introduction: 'Here are your study materials.',
+          summary: combinedTranscription.text_content.raw_text,
+          flashcards: [],
+          quiz: [],
+          vocabulary_tables: [],
+          subject_area: classification.subject_area || 'GENERAL'
+        };
+        
+        console.log('[Server] Using fallback study materials structure');
       }
 
       // Normalize quiz data structure
@@ -1153,8 +1225,10 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         contentType: 'study-set',
         introduction: studyMaterials.introduction || 'I analyzed your content. Here\'s some material to help you master this subject.',
         summary: studyMaterials.summary || '',
+        subject_area: studyMaterials.subject_area || classification.subject_area || 'GENERAL',
         flashcards: studyMaterials.flashcards || [],
         quiz: normalizedQuiz,
+        vocabulary_tables: studyMaterials.vocabulary_tables || [],
         created_at: Date.now(),
         updated_at: Date.now(),
         processingId

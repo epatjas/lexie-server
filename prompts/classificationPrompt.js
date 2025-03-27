@@ -26,6 +26,44 @@ TEXTBOOK_MATERIAL characteristics (classify this way if MAJORITY applies):
 - Content has a structured flow of information building on previous concepts
 - If exercises exist, they serve to reinforce the material just taught
 
+## SUBJECT AREA RECOGNITION
+Determine which primary subject area the content belongs to:
+
+1. **LANGUAGE LEARNING** - Content showing these elements:
+   - Vocabulary lists or translations
+   - Grammar rules or patterns
+   - Practice dialogues or texts
+   - Language acquisition exercises
+   - Pronunciation guides
+
+2. **MATHEMATICS** - Content showing these elements:
+   - Formulas and equations
+   - Problem examples
+   - Step-by-step solutions
+   - Visual representations
+   - Numerical operations
+
+3. **SCIENCE** - Content showing these elements:
+   - Concepts and definitions
+   - Processes and relationships
+   - Experimental methods
+   - Diagrams and classifications
+   - Natural or physical phenomena
+
+4. **READING & LITERATURE** - Content showing these elements:
+   - Stories or passages
+   - Literary elements
+   - Comprehension questions
+   - Character/plot analysis
+   - Text interpretation
+
+5. **ARTS & HUMANITIES** - Content showing these elements:
+   - Historical events/timelines
+   - Cultural concepts
+   - Interpretative frameworks
+   - Creative techniques
+   - Social studies content
+
 EXAMPLES of TEXTBOOK_MATERIAL with exercises:
 - A biology chapter explaining cell structure with a few questions at the end
 - A language textbook with vocabulary lists and practice exercises
@@ -47,7 +85,7 @@ Your response must be EXACTLY this JSON structure with NO additional text:
 {
   "classification": "PROBLEM_ASSIGNMENT",
   "confidence": "HIGH",
-  "subject_area": "Math",
+  "subject_area": "LANGUAGE_LEARNING|MATHEMATICS|SCIENCE|READING_LITERATURE|ARTS_HUMANITIES",
   "language": "English",
   "processing_approach": "Problem Assistance"
 }
