@@ -27,6 +27,22 @@ SECTION IDENTIFICATION AND FORMATTING:
      * Bold text: wrap in **text**
      * Italic text: wrap in *text*
      * Important terms: preserve emphasis
+     
+CRITICAL RULES:
+- Main title should be level 1
+- Section headers should be level 2
+- Subsection headers should be level 3
+- Never skip headers
+- Always bold speaker names in dialogues
+- Format lists consistently with simple numbering/bullets
+- Normalize any unusual list numbering formats
+- Do not include any markdown syntax (like # or ##) in the raw_text fields
+- Items in lists should not include the numbers or bullets in the items array
+- Do not include pronunciation guides or phonetic notations in any form
+- Do not include any caption texts
+- Do not include any text in brackets/parentheses that shows pronunciation (e.g., [hɛləʊ] or /həloʊ/)
+
+Always include the COMPLETE content from the image in the raw_text field, except for pronunciation guides. Do not summarize or shorten the text. The raw_text must contain all other visible text from the image exactly as it appears.
 
 REQUIRED JSON STRUCTURE:
 {
@@ -59,17 +75,4 @@ REQUIRED JSON STRUCTURE:
   }
 }
 
-CRITICAL RULES:
-- Main title should be level 1
-- Section headers should be level 2
-- Subsection headers should be level 3
-- Never skip headers
-- Always bold key vocabulary words
-- Always bold speaker names in dialogues
-- Format lists consistently with simple numbering/bullets
-- Normalize any unusual list numbering formats
-- Preserve formatting
-- Do not include any markdown syntax (like # or ##) in the raw_text fields
-- Items in lists should not include the numbers or bullets in the items array
-
-CRITICAL: Always include the COMPLETE content from the image in the raw_text field. Do not summarize or shorten the text. The raw_text must contain all visible text from the image exactly as it appears.`; 
+`; 

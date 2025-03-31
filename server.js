@@ -720,7 +720,23 @@ const updateProcessingStatus = (id, stage, result = null) => {
 
 // TTS endpoint
 app.post('/tts', async (req, res) => {
-  const { text, type = 'chunk', language } = req.body;
+  let { text, language = 'en', type = 'chunk' } = req.body;
+  
+  // Always use full mode for short texts like flashcards
+  if (text.length < 100) {
+    type = 'full';
+  }
+  
+  // If the language is Finnish, always use full mode regardless of length
+  if (language === 'fi' || text.match(/[äöåÄÖÅ]/)) {
+    type = 'full';
+    
+    // For Finnish, add spaces around punctuation to help TTS engine
+    text = text.replace(/([.,!?:;])(\w)/g, '$1 $2')
+               .replace(/(\w)([.,!?:;])/g, '$1 $2');
+    
+    console.log(`[TTS] Finnish text normalized: "${text}"`);
+  }
   
   // Always use Nova voice as preferred by user, regardless of language
   const voice = "nova";
@@ -733,6 +749,7 @@ app.post('/tts', async (req, res) => {
   
   if (isFinish) {
     console.log('[TTS] Detected Finnish content, still using nova voice as preferred');
+    // No specific text processing for Finnish!
   }
   
   const speed = 1.0;

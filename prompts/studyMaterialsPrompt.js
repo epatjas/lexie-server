@@ -65,24 +65,22 @@ For vocabulary learning content:
 - Do not capitalize every word in titles, headings, or list items
 
 ## Summary requirements
-- Write 200-350 words explaining the key concepts in Finnish
-- Use proper markdown formatting:
-  - ## Headings for main sections
-  - ### Subheadings for subtopics
-  - **Bold** for important terms
-  - *Italics* for emphasis
+- For vocabulary content:
+  - Include only the full vocabulary table in markdown format
+  - No introduction or explanation needed
+- For subject content:
+  - Write 200-350 words explaining the key concepts in Finnish
+  - Use proper markdown formatting:
+    - ## Headings for main sections
+    - ### Subheadings for subtopics
+    - **Bold** for important terms
+    - *Italics* for emphasis
   - Bullet lists for related items
   - Numbered lists for sequences
-- Begin with an overview of the main topic
-- End with how the concepts connect to broader understanding
 - Always write the summary in Finnish
-- For vocabulary content:
-  - Start with a very brief intro in Finnish (1-2 sentences)
-  - Then include the full vocabulary table in markdown format
-  - Include a brief Finnish explanation of how to use these vocabulary terms
 
 ## Flashcard requirements
-- Create at least 10 high-quality flashcards (15-20 is ideal)
+- Create AT LEAST 15-20 high-quality flashcards 
 - For subject content (science, math, etc.) in Finnish:
   - Front: key term or concept in Finnish
   - Back: explanation or definition in Finnish
@@ -100,27 +98,27 @@ For vocabulary learning content:
   - Be concise and direct
 
 ## Quiz requirements
-- Create at least 10 high-quality multiple-choice questions (10-15 is ideal)
-- Always write questions in Finnish regardless of content language
-- For subject content (science, math, etc.):
-  - Questions should test understanding of concepts, not vocabulary
-  - Example: "Mikä on kierrätyksen tärkein hyöty ympäristölle?"
-- For vocabulary content only:
-  - Only create questions about the actual language pairs in the content
-  - For French-Finnish vocabulary, ask: "Mitä tarkoittaa ranskan kielen sana 'jour' suomeksi?"
-  - Never ask: "Mitä tarkoittaa englannin kielen sana 'day' ranskaksi?" when content is French-Finnish
-  - Questions must test the exact translations that appear in the scanned content
-- Design questions specifically for Finnish students aged 8-16
-- Include a mix of:
-  - Basic recall questions (30%)
-  - Understanding/application questions (40%)
-  - Analysis questions (30%)
-- Each question must have:
-  - Clear, unambiguous wording in Finnish
-  - Exactly 4 answer options
-  - Only one correct answer
-  - Logical, plausible distractors
-  - Brief explanation for the correct answer in Finnish
+* Create AT LEAST 10-15 multiple-choice questions in Finnish
+* Each question must have:
+    * One clear question
+    * Exactly 4 answer options
+    * Only one correct answer 
+* For subject content (science, history, etc.):
+    * Focus on testing understanding, not just facts
+    * Include a mix of these question types:
+        * Recall questions (what, when, who)
+        * Understanding questions (how, why, what if)
+        * Analysis questions (compare, predict)
+        * Example: "Mikä seuraavista on uusiutuva energianlähde?"
+
+* For language learning/vocabulary content only:
+    1. Only use words/phrases from the provided content
+    2. Questions must test the exact translations that appear in the scanned content
+    3. Include:
+        * Translation questions in both directions
+        * Grammar questions (correct forms, word order)
+        * Context questions (how to use words in sentences)
+    * Examples: "Mikä on sanan "beautiful" oikea suomennos?", "Valitse oikea käännös lauseelle "The cat is sleeping on the sofa.""
 
 ## Vocabulary table format
 For vocabulary content, use this exact markdown table format in the summary:
@@ -195,8 +193,6 @@ For vocabulary content, use this exact markdown table format in the summary:
 3. Content is correctly classified (subject content vs. language learning)
 4. For subject content: flashcards are concept-explanation pairs, not translations
 5. For vocabulary content: tables are included directly in the summary field
-6. At least 10 high-quality flashcards of the appropriate type for the content
-7. At least 10 high-quality multiple-choice questions in Finnish
 8. Quiz questions match the content type (concept questions for subject content)
 9. No pronunciation guides anywhere
 10. Introduction is in Finnish and conversational
