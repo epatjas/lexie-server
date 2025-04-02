@@ -339,61 +339,136 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
 
     // STEP 3: BRANCH BASED ON CLASSIFICATION
     if (classification.classification === "PROBLEM_ASSIGNMENT") {
-      console.log(`[${new Date().toISOString()}] Using problem assistance approach`);
+      console.log(`[${new Date().toISOString()}] Using enhanced problem assistance approach`);
       
-      // STEP 3A: HOMEWORK HELP PATH
-      const homeworkHelpResponse = await makeRequestWithRetry(() => 
+      // 1. Analyze content length and complexity
+      const contentLength = combinedTranscription.text_content.raw_text.length;
+      const contentComplexity = contentLength > 5000 ? 'high' : contentLength > 2000 ? 'medium' : 'low';
+      console.log(`[${new Date().toISOString()}] Problem content analysis: length=${contentLength}, complexity=${contentComplexity}`);
+
+      // 2. Create intelligent content chunks
+      const contentChunks = getIntelligentChunks(combinedTranscription.text_content.raw_text);
+      console.log(`[${new Date().toISOString()}] Created ${contentChunks.length} intelligent content chunks`);
+
+      // 3. FIRST CALL: Get problem analysis and summary
+      const problemAnalysisStream = await makeRequestWithRetry(() => 
         openai.chat.completions.create({
           model: "gpt-4o",
           messages: [{
+            role: "system",
+            content: `You are an AI that helps with homework problems. Generate ONLY the basic problem analysis.
+            Your response must be valid JSON with ONLY these fields:
+            {
+              "title": "Brief title describing the problem",
+              "problem_summary": "Detailed explanation of the problem",
+              "problem_type": "MATH|PHYSICS|CHEMISTRY|BIOLOGY|HISTORY|OTHER",
+              "approach_guidance": "General guidance on how to approach this problem",
+              "language": "en|fi"
+            }
+            
+            IMPORTANT: Since this problem is ${contentComplexity} complexity (${contentLength} characters):
+            1. Create a ${contentComplexity === 'high' ? 'very detailed' : contentComplexity === 'medium' ? 'moderately detailed' : 'concise'} problem summary
+            2. The language field should reflect the language of the problem (${classification.language})
+            3. Use proper markdown formatting where appropriate`
+          }, {
             role: "user",
-            content: `${homeworkHelpPrompt}\n\nProblem Type: ${classification.subject_area}\n\nHomework Content:\n${combinedTranscription.text_content.raw_text}`,
+            content: `${homeworkHelpPrompt}
+
+IMPORTANT OVERRIDE: Generate ONLY the problem analysis fields listed above.
+Do not generate concept cards in this response.
+
+Problem Type: ${classification.subject_area}
+Homework Content:
+${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
+          }],
+          max_tokens: 2048,
+          stream: true
+        })
+      );
+
+      // Process the first response
+      let problemAnalysisResponse = '';
+      for await (const chunk of problemAnalysisStream) {
+        problemAnalysisResponse += chunk.choices[0]?.delta?.content || '';
+      }
+      console.log('[Server] First call completed - Problem analysis');
+
+      // Parse problem analysis
+      const problemAnalysis = await parseJsonSafely(problemAnalysisResponse, {
+        title: combinedTranscription.title || `${classification.subject_area} Problem`,
+        problem_summary: combinedTranscription.text_content.raw_text,
+        problem_type: classification.subject_area || 'OTHER',
+        approach_guidance: '',
+        language: classification.language || 'en'
+      });
+
+      // 4. SECOND CALL: Get concept cards
+      const cardCount = getAppropriateCardCount(contentComplexity, classification);
+      console.log(`[${new Date().toISOString()}] Generating ${cardCount} concept cards based on problem complexity`);
+
+      const conceptCardsStream = await makeRequestWithRetry(() => 
+        openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{
+            role: "system",
+            content: `You are an AI that creates educational concept cards for homework problems. Generate ONLY the concept_cards array.
+            Your response must be valid JSON with ONLY this field:
+            {
+              "concept_cards": [
+                {
+                  "card_number": 1,
+                  "title": "Concept title",
+                  "explanation": "Detailed explanation of the concept",
+                  "hint": "Hint to apply this concept to the problem"
+                }
+              ]
+            }
+            
+            QUALITY REQUIREMENTS:
+            1. Create EXACTLY ${cardCount} high-quality concept cards
+            2. Each card should focus on a distinct concept needed to understand the problem type
+            3. Cards should be sequenced in logical order (fundamentals first, then more complex concepts)
+            4. ALL content MUST be in the SAME LANGUAGE as the source material (${problemAnalysis.language})`
+          }, {
+            role: "user",
+            content: `${homeworkHelpPrompt}
+
+IMPORTANT OVERRIDE: Generate ONLY concept cards following the guidelines in the homeworkHelpPrompt.
+Focus exclusively on creating ${cardCount} high-quality concept cards.
+
+Problem Title: ${problemAnalysis.title}
+Problem Summary: ${problemAnalysis.problem_summary}
+Approach Guidance: ${problemAnalysis.approach_guidance}
+
+Problem Content:
+${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`,
           }],
           max_tokens: 4096,
           stream: true
         })
       );
 
-      let homeworkHelpContent = '';
-      for await (const chunk of homeworkHelpResponse) {
-        homeworkHelpContent += chunk.choices[0]?.delta?.content || '';
+      // Process the second response
+      let conceptCardsResponse = '';
+      for await (const chunk of conceptCardsStream) {
+        conceptCardsResponse += chunk.choices[0]?.delta?.content || '';
       }
+      console.log('[Server] Second call completed - Concept cards generation');
 
-      // Parse homework help
-      let jsonContent = homeworkHelpContent;
-      const startIndex = homeworkHelpContent.indexOf('{');
-      const endIndex = homeworkHelpContent.lastIndexOf('}') + 1;
+      // Parse concept cards
+      const conceptCardsData = await parseJsonSafely(conceptCardsResponse, {
+        concept_cards: []
+      });
 
-      if (startIndex >= 0 && endIndex > startIndex) {
-        jsonContent = homeworkHelpContent.substring(startIndex, endIndex);
-      }
-
-      let homeworkHelp;
-      try {
-        if (jsonContent.trim().startsWith('{') && jsonContent.trim().endsWith('}')) {
-          homeworkHelp = JSON.parse(jsonContent);
-          console.log(`[${new Date().toISOString()}] Successfully parsed homework help`);
-        } else {
-          throw new Error("Invalid JSON format");
-        }
-      } catch (parseError) {
-        console.error(`[${new Date().toISOString()}] Failed to parse homework help:`, parseError);
-        // Return a default structure matching the expected format
-        homeworkHelp = {
-          assignment: {
-            facts: ["Content could not be properly analyzed"],
-            objective: "Understanding the given problem"
-          },
-          concept_cards: [
-            {
-              card_number: 1,
-              title: "Try Again with a Clearer Image",
-              explanation: "The system had trouble understanding your homework problem.",
-              hint: "Consider uploading a clearer image or typing out the problem manually."
-            }
-          ]
-        };
-      }
+      // 5. Combine all results
+      const homeworkHelp = {
+        title: problemAnalysis.title,
+        problem_summary: problemAnalysis.problem_summary,
+        problem_type: problemAnalysis.problem_type,
+        approach_guidance: problemAnalysis.approach_guidance,
+        language: problemAnalysis.language,
+        concept_cards: conceptCardsData.concept_cards || []
+      };
 
       // After parsing homeworkHelp
       console.log(`[${new Date().toISOString()}] Generated concept cards:`, 
@@ -401,7 +476,7 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
         `${homeworkHelp.concept_cards.length} cards` : 
         'No cards generated');
 
-      // Keep this validation after parsing the response:
+      // Keep validation for problem summary
       if (!homeworkHelp.problem_summary || homeworkHelp.problem_summary.length < combinedTranscription.text_content.raw_text.length * 0.5) {
         console.log(`[${new Date().toISOString()}] Problem summary seems incomplete, adding full transcription`);
         homeworkHelp.problem_summary = combinedTranscription.text_content.raw_text;
@@ -425,100 +500,195 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
         updated_at: Date.now()
       };
       
+      // Store the processing status
+      updateProcessingStatus(processingId, 'completed', primaryResult);
+
+      // Send the response
+      console.log(`[${new Date().toISOString()}] Sending homework help response to client`);
+      res.json(primaryResult);
     } else {
-      console.log(`[${new Date().toISOString()}] Using study materials approach`);
-      
-      // STEP 3B: STUDY MATERIALS PATH
-      const stream = await makeRequestWithRetry(() => 
+      console.log(`[${new Date().toISOString()}] Using enhanced study materials approach with content-aware multi-call generation`);
+
+      // 1. Analyze content length and complexity
+      const contentLength = combinedTranscription.text_content.raw_text.length;
+      const contentComplexity = contentLength > 5000 ? 'high' : contentLength > 2000 ? 'medium' : 'low';
+      console.log(`[${new Date().toISOString()}] Content analysis: length=${contentLength}, complexity=${contentComplexity}`);
+
+      // 2. Create intelligent content chunks
+      const contentChunks = getIntelligentChunks(combinedTranscription.text_content.raw_text);
+      console.log(`[${new Date().toISOString()}] Created ${contentChunks.length} intelligent content chunks`);
+
+      // 3. FIRST CALL: Get title, introduction, and detailed summary
+      const basicInfoStream = await makeRequestWithRetry(() => 
         openai.chat.completions.create({
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: `You are an AI that creates educational study materials. You MUST return a JSON object with EXACTLY these fields:
-{
-  "title": "string",
-  "text_content": {
-    "raw_text": "string",
-    "sections": []
-  },
-  "introduction": "string",
-  "summary": "string",
-  "flashcards": [{"front": "string", "back": "string"}],
-  "quiz": [{
-    "question": "string",
-    "options": ["string"],
-    "correct": "string",
-    "explanation": "string"
-  }]
-}`
+            content: `You are an AI that creates educational study materials. Generate ONLY the basic information fields.
+            Your response must be valid JSON with ONLY these fields:
+            {
+              "title": "Title derived from content",
+              "introduction": "Brief introduction in the SAME LANGUAGE as content",
+              "summary": "DETAILED summary with markdown formatting",
+              "subject_area": "LANGUAGE_LEARNING|MATHEMATICS|SCIENCE|READING_LITERATURE|ARTS_HUMANITIES"
+            }
+            
+            IMPORTANT: Since this content is ${contentComplexity} complexity (${contentLength} characters):
+            1. Create a ${contentComplexity === 'high' ? 'very detailed' : contentComplexity === 'medium' ? 'moderately detailed' : 'concise'} summary
+            2. Include ALL key concepts and terms that should be used for flashcards
+            3. The summary MUST be in the SAME LANGUAGE as the source material (${classification.language})
+            4. Use proper markdown formatting with headings, bullet points, and emphasis`
           }, {
             role: "user",
-            content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
+            content: `${studyMaterialsPrompt}
+
+IMPORTANT OVERRIDE: Generate ONLY title, introduction, and summary fields following the guidelines above.
+Do not generate flashcards or quiz questions in this response.
+
+Transcription to use:
+${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
+          }],
+          max_tokens: 2048,
+          stream: true
+        })
+      );
+
+      // Process the first response
+      let basicInfoResponse = '';
+      for await (const chunk of basicInfoStream) {
+        basicInfoResponse += chunk.choices[0]?.delta?.content || '';
+      }
+      console.log('[Server] First call completed - Basic info generation');
+
+      // Parse basic info
+      const basicInfo = await parseJsonSafely(basicInfoResponse, {
+        title: combinedTranscription.title || 'Untitled Study Set',
+        introduction: 'Let\'s study this material together.',
+        summary: '',
+        subject_area: classification.subject_area || 'GENERAL'
+      });
+
+      // 4. SECOND CALL: Get appropriate number of high-quality flashcards
+      const flashcardCount = getAppropriateFlashcardCount(contentComplexity, classification);
+      console.log(`[${new Date().toISOString()}] Generating ${flashcardCount} flashcards based on content complexity`);
+
+      const flashcardsStream = await makeRequestWithRetry(() => 
+        openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{
+            role: "system",
+            content: `You are an AI that creates educational flashcards. Generate ONLY the flashcards array.
+            Your response must be valid JSON with ONLY this field:
+            {
+              "flashcards": [
+                {"front": "term/concept", "back": "definition/explanation"}
+              ]
+            }
+            
+            QUALITY REQUIREMENTS:
+            1. Create EXACTLY ${flashcardCount} high-quality flashcards
+            2. Each flashcard must cover a distinct important concept
+            3. Front side should be concise (typically 1-5 words)
+            4. Back side should be comprehensive yet concise (30-100 words)
+            5. For vocabulary content: use direct translations
+            6. For subject content: use explanations that demonstrate understanding
+            7. ALL content MUST be in the SAME LANGUAGE as the source material (${classification.language})`
+          }, {
+            role: "user",
+            content: `${studyMaterialsPrompt}
+
+IMPORTANT OVERRIDE: Generate ONLY flashcards following the guidelines above.
+Focus exclusively on creating ${flashcardCount} high-quality flashcards that cover the most important concepts.
+
+Title: ${basicInfo.title}
+Summary: ${basicInfo.summary}
+
+Content chunks:
+${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`,
           }],
           max_tokens: 4096,
           stream: true
         })
       );
 
-      let studyMaterialsResponse = '';
-      for await (const chunk of stream) {
-        studyMaterialsResponse += chunk.choices[0]?.delta?.content || '';
+      // Process the second response
+      let flashcardsResponse = '';
+      for await (const chunk of flashcardsStream) {
+        flashcardsResponse += chunk.choices[0]?.delta?.content || '';
       }
+      console.log('[Server] Second call completed - Flashcards generation');
 
-      let studyMaterials;
-      try {
-        // Add error logging
-        console.log('[Server] Raw response preview:', studyMaterialsResponse.substring(0, 500));
-        
-        const cleanedResponse = studyMaterialsResponse
-          .trim()
-          .replace(/^```json\s*/i, '')
-          .replace(/^```\s*/i, '')
-          .replace(/\s*```$/i, '')
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-          .trim();
+      // Parse flashcards
+      const flashcardsData = await parseJsonSafely(flashcardsResponse, {
+        flashcards: []
+      });
 
-        studyMaterials = JSON.parse(cleanedResponse);
-        
-        // Transform the response to match expected format
-        studyMaterials = {
-          title: studyMaterials.title || combinedTranscription.title || 'Untitled Study Set',
-          text_content: studyMaterials.text_content || combinedTranscription.text_content,
-          introduction: studyMaterials.introduction || 'Let\'s study this material together.',
-          summary: studyMaterials.summary || studyMaterials.text_summary || combinedTranscription.text_content.raw_text,
-          flashcards: Array.isArray(studyMaterials.flashcards) ? studyMaterials.flashcards : [],
-          quiz: Array.isArray(studyMaterials.quiz) ? studyMaterials.quiz : [],
-          vocabulary_tables: Array.isArray(studyMaterials.vocabulary_tables) ? studyMaterials.vocabulary_tables : [],
-          subject_area: studyMaterials.subject_area || classification.subject_area || 'GENERAL'
-        };
+      // 5. THIRD CALL: Get quiz questions
+      const quizCount = getAppropriateQuizCount(contentComplexity, classification);
+      console.log(`[${new Date().toISOString()}] Generating ${quizCount} quiz questions based on content complexity`);
 
-        // Validate the structure
-        console.log('[Server] Parsed study materials structure:', {
-          hasTitle: !!studyMaterials.title,
-          hasTextContent: !!studyMaterials.text_content,
-          hasSummary: !!studyMaterials.summary,
-          flashcardsCount: studyMaterials.flashcards.length,
-          quizCount: studyMaterials.quiz.length
-        });
+      const quizStream = await makeRequestWithRetry(() => 
+        openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{
+            role: "system",
+            content: `You are an AI that creates educational quiz questions. Generate ONLY the quiz array.
+            Your response must be valid JSON with ONLY this field:
+            {
+              "quiz": [
+                {"question": "question text", "options": ["option1", "option2", "option3", "option4"], "correct": "correct option", "explanation": "brief explanation"}
+              ]
+            }
+            
+            QUALITY REQUIREMENTS:
+            1. Create EXACTLY ${quizCount} high-quality multiple-choice questions
+            2. Each question must test understanding of a distinct important concept
+            3. Include a mix of difficulty levels (40% easy, 40% medium, 20% challenging)
+            4. Every question MUST have EXACTLY 4 options
+            5. All wrong answers must be plausible distractors
+            6. Include a brief explanation for why the correct answer is right
+            7. ALL content MUST be in the SAME LANGUAGE as the source material (${classification.language})`
+          }, {
+            role: "user",
+            content: `${studyMaterialsPrompt}
 
-      } catch (parseError) {
-        console.error('[Server] Parse error:', parseError);
-        console.error('[Server] Failed content:', studyMaterialsResponse);
+IMPORTANT OVERRIDE: Generate ONLY quiz questions following the guidelines above.
+Focus exclusively on creating ${quizCount} high-quality quiz questions that test understanding of key concepts.
+
+Title: ${basicInfo.title}
+Summary: ${basicInfo.summary}
         
-        // Create a fallback response
-        studyMaterials = {
-          title: combinedTranscription.title || 'Untitled Study Set',
-          text_content: combinedTranscription.text_content,
-          introduction: 'Here are your study materials.',
-          summary: combinedTranscription.text_content.raw_text,
-          flashcards: [],
-          quiz: [],
-          vocabulary_tables: [],
-          subject_area: classification.subject_area || 'GENERAL'
-        };
-        
-        console.log('[Server] Using fallback study materials structure');
+Content chunks:
+${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`,
+          }],
+          max_tokens: 4096,
+          stream: true
+        })
+      );
+
+      // Process the third response
+      let quizResponse = '';
+      for await (const chunk of quizStream) {
+        quizResponse += chunk.choices[0]?.delta?.content || '';
       }
+      console.log('[Server] Third call completed - Quiz generation');
+
+      // Parse quiz questions
+      const quizData = await parseJsonSafely(quizResponse, {
+        quiz: []
+      });
+
+      // 6. Combine all results
+      const studyMaterials = {
+        title: basicInfo.title,
+        text_content: combinedTranscription.text_content,
+        introduction: basicInfo.introduction,
+        summary: basicInfo.summary,
+        flashcards: flashcardsData.flashcards || [],
+        quiz: quizData.quiz || [],
+        vocabulary_tables: [],
+        subject_area: basicInfo.subject_area
+      };
 
       // Normalize quiz data structure
       let normalizedQuiz = [];
@@ -530,9 +700,9 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
         }
       }
 
-      // Return study materials result
-      primaryResult = {
-        title: studyMaterials.title || combinedTranscription.title,
+      // Create a result that includes both the classification and study materials
+      const result = {
+        title: combinedTranscription.title,
         text_content: combinedTranscription.text_content,
         contentType: 'study-set',
         introduction: studyMaterials.introduction || 'I analyzed your content. Here\'s some material to help you master this subject.',
@@ -545,128 +715,19 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
         updated_at: Date.now(),
         processingId
       };
+
+      // After parsing homeworkHelp
+      console.log(`[${new Date().toISOString()}] Generated concept cards:`, 
+        result.homeworkHelp ? 
+        `${result.homeworkHelp.concept_cards.length} cards` : 
+        'No cards generated');
+
+      // Before sending the response, store the full result
+      updateProcessingStatus(processingId, 'completed', result);
+
+      // Then send the response
+      res.json(result);
     }
-
-    // NEW: Validate if necessary data was generated
-    let needsFallback = false;
-
-    if (primaryResult.contentType === 'study-set' && 
-        (!primaryResult.flashcards || primaryResult.flashcards.length === 0 || 
-         !primaryResult.quiz || primaryResult.quiz.length === 0)) {
-      console.log(`[${new Date().toISOString()}] Study materials missing essential content, generating fallback`);
-      needsFallback = true;
-    }
-
-    // Generate fallback if needed
-    if (needsFallback) {
-      try {
-        console.log(`[${new Date().toISOString()}] Generating fallback content...`);
-        
-        // Force generating flashcards if they're missing
-        if (!primaryResult.flashcards || primaryResult.flashcards.length === 0) {
-          const flashcardResponse = await makeRequestWithRetry(() => 
-            openai.chat.completions.create({
-              model: "gpt-4o",
-              messages: [{
-                role: "user",
-                content: `Create 5-10 flashcards based on this text. Format as JSON array with "front" and "back" properties:
-                  
-                  ${combinedTranscription.text_content.raw_text}`,
-              }],
-              max_tokens: 2048,
-            })
-          );
-          
-          try {
-            const flashcardContent = flashcardResponse.choices[0].message.content;
-            // Extract JSON
-            const jsonMatch = flashcardContent.match(/\[\s*\{.*\}\s*\]/s);
-            if (jsonMatch) {
-              const flashcards = JSON.parse(jsonMatch[0]);
-              primaryResult.flashcards = flashcards;
-              console.log(`[${new Date().toISOString()}] Generated ${flashcards.length} fallback flashcards`);
-            }
-          } catch (error) {
-            console.error('[Server] Fallback flashcard parsing error:', error);
-          }
-        }
-        
-        // Force generating quiz if it's missing
-        if (!primaryResult.quiz || primaryResult.quiz.length === 0) {
-          const quizResponse = await makeRequestWithRetry(() => 
-            openai.chat.completions.create({
-              model: "gpt-4o",
-              messages: [{
-                role: "user",
-                content: `Create 5 quiz questions based on this text. Format as JSON array with "question", "options" (array), "correct" (matching one option), and "explanation" properties:
-                  
-                  ${combinedTranscription.text_content.raw_text}`,
-              }],
-              max_tokens: 2048,
-            })
-          );
-          
-          try {
-            const quizContent = quizResponse.choices[0].message.content;
-            // Extract JSON
-            const jsonMatch = quizContent.match(/\[\s*\{.*\}\s*\]/s);
-            if (jsonMatch) {
-              const quiz = JSON.parse(jsonMatch[0]);
-              primaryResult.quiz = quiz;
-              console.log(`[${new Date().toISOString()}] Generated ${quiz.length} fallback quiz questions`);
-            }
-          } catch (error) {
-            console.error('[Server] Fallback quiz parsing error:', error);
-          }
-        }
-        
-        // Generate summary if it's missing
-        if (!primaryResult.summary) {
-          const summaryResponse = await makeRequestWithRetry(() => 
-            openai.chat.completions.create({
-              model: "gpt-4o",
-              messages: [{
-                role: "user",
-                content: `Summarize this text in 2-4 paragraphs:
-                  
-                  ${combinedTranscription.text_content.raw_text}`,
-              }],
-              max_tokens: 1024,
-            })
-          );
-          
-          primaryResult.summary = summaryResponse.choices[0].message.content.trim();
-          console.log(`[${new Date().toISOString()}] Generated fallback summary`);
-        }
-        
-      } catch (fallbackError) {
-        console.error('[Server] Error generating fallback content:', fallbackError);
-      }
-    }
-
-    // Use the primaryResult (with fallback additions if needed)
-    result = primaryResult;
-
-    const totalTime = Date.now() - startTime;
-    console.log(`[${new Date().toISOString()}] Analysis completed in ${totalTime}ms`);
-    
-    // Make sure the original text is always preserved somewhere accessible in the response
-    if (!result.text_content || !result.text_content.raw_text) {
-      console.log(`[${new Date().toISOString()}] Adding missing text_content from transcription`);
-      result.text_content = combinedTranscription.text_content;
-    }
-
-    // If it's a study set but might actually be a homework problem
-    if (result.contentType === 'study-set' && 
-        (combinedTranscription.text_content.raw_text.includes('?') || 
-         combinedTranscription.text_content.raw_text.length < 500)) {
-      console.log(`[${new Date().toISOString()}] Possible misclassified content detected`);
-      // Store original text in a separate field instead of modifying the summary
-      result.original_text = combinedTranscription.text_content.raw_text;
-      result.possible_misclassification = true;
-    }
-
-    res.json(result);
 
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error:`, error);
@@ -1011,20 +1072,20 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         .replace(/\s*```$/i, '')      // Remove closing ```
         .trim();
         
-      console.log(`[${new Date().toISOString()}] Cleaned classification result for parsing`);
-      
-      // Add validation check for JSON structure
-      if (cleanedResult.startsWith('{') && cleanedResult.endsWith('}')) {
-        const parsedClassification = JSON.parse(cleanedResult);
-        classification = {
-          ...classification, // Maintain defaults
-          ...parsedClassification // Override with parsed values
-        };
-        console.log(`[${new Date().toISOString()}] Content classified as: ${classification.classification} (${classification.subject_area})`);
-      } else {
-        console.log(`[${new Date().toISOString()}] Classification result is not valid JSON, using defaults`);
-        // Use default values, already set above
-      }
+        console.log(`[${new Date().toISOString()}] Cleaned classification result for parsing`);
+        
+        // Add validation check for JSON structure
+        if (cleanedResult.startsWith('{') && cleanedResult.endsWith('}')) {
+          const parsedClassification = JSON.parse(cleanedResult);
+          classification = {
+            ...classification, // Maintain defaults
+            ...parsedClassification // Override with parsed values
+          };
+          console.log(`[${new Date().toISOString()}] Content classified as: ${classification.classification} (${classification.subject_area})`);
+        } else {
+          console.log(`[${new Date().toISOString()}] Classification result is not valid JSON, using defaults`);
+          // Use default values, already set above
+        }
     } catch (parseError) {
       console.error('[Server] Classification parse error:', parseError);
       console.error('[Server] Content that failed to parse:', classificationResult);
@@ -1044,61 +1105,136 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
 
     // STEP 3: BRANCH BASED ON CLASSIFICATION
     if (classification.classification === "PROBLEM_ASSIGNMENT") {
-      console.log(`[${new Date().toISOString()}] Using problem assistance approach`);
+      console.log(`[${new Date().toISOString()}] Using enhanced problem assistance approach`);
       
-      // STEP 3A: HOMEWORK HELP PATH
-      const homeworkHelpResponse = await makeRequestWithRetry(() => 
+      // 1. Analyze content length and complexity
+      const contentLength = combinedTranscription.text_content.raw_text.length;
+      const contentComplexity = contentLength > 5000 ? 'high' : contentLength > 2000 ? 'medium' : 'low';
+      console.log(`[${new Date().toISOString()}] Problem content analysis: length=${contentLength}, complexity=${contentComplexity}`);
+
+      // 2. Create intelligent content chunks
+      const contentChunks = getIntelligentChunks(combinedTranscription.text_content.raw_text);
+      console.log(`[${new Date().toISOString()}] Created ${contentChunks.length} intelligent content chunks`);
+
+      // 3. FIRST CALL: Get problem analysis and summary
+      const problemAnalysisStream = await makeRequestWithRetry(() => 
         openai.chat.completions.create({
           model: "gpt-4o",
           messages: [{
+            role: "system",
+            content: `You are an AI that helps with homework problems. Generate ONLY the basic problem analysis.
+            Your response must be valid JSON with ONLY these fields:
+            {
+              "title": "Brief title describing the problem",
+              "problem_summary": "Detailed explanation of the problem",
+              "problem_type": "MATH|PHYSICS|CHEMISTRY|BIOLOGY|HISTORY|OTHER",
+              "approach_guidance": "General guidance on how to approach this problem",
+              "language": "en|fi"
+            }
+            
+            IMPORTANT: Since this problem is ${contentComplexity} complexity (${contentLength} characters):
+            1. Create a ${contentComplexity === 'high' ? 'very detailed' : contentComplexity === 'medium' ? 'moderately detailed' : 'concise'} problem summary
+            2. The language field should reflect the language of the problem (${classification.language})
+            3. Use proper markdown formatting where appropriate`
+          }, {
             role: "user",
-            content: `${homeworkHelpPrompt}\n\nProblem Type: ${classification.subject_area}\n\nHomework Content:\n${combinedTranscription.text_content.raw_text}`,
+            content: `${homeworkHelpPrompt}
+
+IMPORTANT OVERRIDE: Generate ONLY the problem analysis fields listed above.
+Do not generate concept cards in this response.
+
+Problem Type: ${classification.subject_area}
+Homework Content:
+${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
+          }],
+          max_tokens: 2048,
+          stream: true
+        })
+      );
+
+      // Process the first response
+      let problemAnalysisResponse = '';
+      for await (const chunk of problemAnalysisStream) {
+        problemAnalysisResponse += chunk.choices[0]?.delta?.content || '';
+      }
+      console.log('[Server] First call completed - Problem analysis');
+
+      // Parse problem analysis
+      const problemAnalysis = await parseJsonSafely(problemAnalysisResponse, {
+        title: combinedTranscription.title || `${classification.subject_area} Problem`,
+        problem_summary: combinedTranscription.text_content.raw_text,
+        problem_type: classification.subject_area || 'OTHER',
+        approach_guidance: '',
+        language: classification.language || 'en'
+      });
+
+      // 4. SECOND CALL: Get concept cards
+      const cardCount = getAppropriateCardCount(contentComplexity, classification);
+      console.log(`[${new Date().toISOString()}] Generating ${cardCount} concept cards based on problem complexity`);
+
+      const conceptCardsStream = await makeRequestWithRetry(() => 
+        openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{
+            role: "system",
+            content: `You are an AI that creates educational concept cards for homework problems. Generate ONLY the concept_cards array.
+            Your response must be valid JSON with ONLY this field:
+            {
+              "concept_cards": [
+                {
+                  "card_number": 1,
+                  "title": "Concept title",
+                  "explanation": "Detailed explanation of the concept",
+                  "hint": "Hint to apply this concept to the problem"
+                }
+              ]
+            }
+            
+            QUALITY REQUIREMENTS:
+            1. Create EXACTLY ${cardCount} high-quality concept cards
+            2. Each card should focus on a distinct concept needed to understand the problem type
+            3. Cards should be sequenced in logical order (fundamentals first, then more complex concepts)
+            4. ALL content MUST be in the SAME LANGUAGE as the source material (${problemAnalysis.language})`
+          }, {
+            role: "user",
+            content: `${homeworkHelpPrompt}
+
+IMPORTANT OVERRIDE: Generate ONLY concept cards following the guidelines in the homeworkHelpPrompt.
+Focus exclusively on creating ${cardCount} high-quality concept cards.
+
+Problem Title: ${problemAnalysis.title}
+Problem Summary: ${problemAnalysis.problem_summary}
+Approach Guidance: ${problemAnalysis.approach_guidance}
+
+Problem Content:
+${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`,
           }],
           max_tokens: 4096,
           stream: true
         })
       );
 
-      let homeworkHelpContent = '';
-      for await (const chunk of homeworkHelpResponse) {
-        homeworkHelpContent += chunk.choices[0]?.delta?.content || '';
+      // Process the second response
+      let conceptCardsResponse = '';
+      for await (const chunk of conceptCardsStream) {
+        conceptCardsResponse += chunk.choices[0]?.delta?.content || '';
       }
+      console.log('[Server] Second call completed - Concept cards generation');
 
-      // Parse homework help
-      let jsonContent = homeworkHelpContent;
-      const startIndex = homeworkHelpContent.indexOf('{');
-      const endIndex = homeworkHelpContent.lastIndexOf('}') + 1;
+      // Parse concept cards
+      const conceptCardsData = await parseJsonSafely(conceptCardsResponse, {
+        concept_cards: []
+      });
 
-      if (startIndex >= 0 && endIndex > startIndex) {
-        jsonContent = homeworkHelpContent.substring(startIndex, endIndex);
-      }
-
-      let homeworkHelp;
-      try {
-        if (jsonContent.trim().startsWith('{') && jsonContent.trim().endsWith('}')) {
-          homeworkHelp = JSON.parse(jsonContent);
-          console.log(`[${new Date().toISOString()}] Successfully parsed homework help`);
-        } else {
-          throw new Error("Invalid JSON format");
-        }
-      } catch (parseError) {
-        console.error(`[${new Date().toISOString()}] Failed to parse homework help:`, parseError);
-        // Return a default structure matching the expected format
-        homeworkHelp = {
-          assignment: {
-            facts: ["Content could not be properly analyzed"],
-            objective: "Understanding the given problem"
-          },
-          concept_cards: [
-            {
-              card_number: 1,
-              title: "Try Again with a Clearer Image",
-              explanation: "The system had trouble understanding your homework problem.",
-              hint: "Consider uploading a clearer image or typing out the problem manually."
-            }
-          ]
-        };
-      }
+      // 5. Combine all results
+      const homeworkHelp = {
+        title: problemAnalysis.title,
+        problem_summary: problemAnalysis.problem_summary,
+        problem_type: problemAnalysis.problem_type,
+        approach_guidance: problemAnalysis.approach_guidance,
+        language: problemAnalysis.language,
+        concept_cards: conceptCardsData.concept_cards || []
+      };
 
       // After parsing homeworkHelp
       console.log(`[${new Date().toISOString()}] Generated concept cards:`, 
@@ -1106,7 +1242,7 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         `${homeworkHelp.concept_cards.length} cards` : 
         'No cards generated');
 
-      // Keep this validation after parsing the response:
+      // Keep validation for problem summary
       if (!homeworkHelp.problem_summary || homeworkHelp.problem_summary.length < combinedTranscription.text_content.raw_text.length * 0.5) {
         console.log(`[${new Date().toISOString()}] Problem summary seems incomplete, adding full transcription`);
         homeworkHelp.problem_summary = combinedTranscription.text_content.raw_text;
@@ -1130,6 +1266,12 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         updated_at: Date.now()
       };
       
+      // Store the processing status
+      updateProcessingStatus(processingId, 'completed', primaryResult);
+
+      // Send the response
+      console.log(`[${new Date().toISOString()}] Sending homework help response to client`);
+      res.json(primaryResult);
     } else {
       console.log(`[${new Date().toISOString()}] Using study materials approach`);
       
@@ -1139,23 +1281,19 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: `You are an AI that creates educational study materials. You MUST return a JSON object with EXACTLY these fields:
-{
-  "title": "string",
-  "text_content": {
-    "raw_text": "string",
-    "sections": []
-  },
-  "introduction": "string",
-  "summary": "string",
-  "flashcards": [{"front": "string", "back": "string"}],
-  "quiz": [{
-    "question": "string",
-    "options": ["string"],
-    "correct": "string",
-    "explanation": "string"
-  }]
-}`
+            content: `You are an AI that creates educational study materials. 
+            MOST IMPORTANT: Your response MUST be ONLY a valid JSON object.
+            Do NOT include any characters before the opening '{' or after the closing '}'.
+            Do NOT add markdown formatting like \`\`\`json or any other text.
+            Your entire response from the first character to the last must be valid parseable JSON.
+            {
+              "title": "string",
+              "text_content": { "raw_text": "string" },
+              "introduction": "string",
+              "summary": "string with markdown",
+              "flashcards": [{"front": "string", "back": "string"}],
+              "quiz": [{"question": "string", "options": ["string"], "correct": "string", "explanation": "string"}]
+            }`
           }, {
             role: "user",
             content: `${studyMaterialsPrompt}\n\nTranscription to use:\n${combinedTranscription.text_content.raw_text}`,
@@ -1170,20 +1308,53 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
         studyMaterialsResponse += chunk.choices[0]?.delta?.content || '';
       }
 
+      console.log('[Server] First 20 characters of raw response:', 
+        studyMaterialsResponse.substring(0, 20)
+          .split('')
+          .map(c => c.charCodeAt(0))
+          .join(','));
+
       let studyMaterials;
       try {
-        // Add error logging
-        console.log('[Server] Raw response preview:', studyMaterialsResponse.substring(0, 500));
-        
+        // More robust JSON parsing approach
         const cleanedResponse = studyMaterialsResponse
           .trim()
-          .replace(/^```json\s*/i, '')
-          .replace(/^```\s*/i, '')
-          .replace(/\s*```$/i, '')
+          // Remove markdown code blocks more thoroughly
+          .replace(/^```json\s*/igm, '')
+          .replace(/^```\s*/igm, '')
+          .replace(/\s*```$/igm, '')
+          // Remove ALL control characters 
           .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+          // Handle potential UTF-8 BOM and other invisible markers
+          .replace(/^\uFEFF/, '')
+          // Make sure we start with a valid opening brace
+          .replace(/^[^{]*({)/, '$1')
           .trim();
 
-        studyMaterials = JSON.parse(cleanedResponse);
+        console.log('[Server] First 10 characters of cleaned response:', cleanedResponse.substring(0, 10));
+        
+        try {
+          studyMaterials = JSON.parse(cleanedResponse);
+          console.log('[Server] Successfully parsed study materials');
+        } catch (innerParseError) {
+          console.error('[Server] Inner JSON parse error:', innerParseError);
+          
+          // Last resort JSON extraction 
+          const regex = /{[\s\S]*}/g; // Match everything between { and } including newlines
+          const jsonMatch = cleanedResponse.match(regex);
+          if (jsonMatch && jsonMatch.length > 0) {
+            try {
+              // Take the longest match (most likely the complete JSON)
+              const bestMatch = jsonMatch.reduce((a, b) => a.length > b.length ? a : b);
+              studyMaterials = JSON.parse(bestMatch);
+              console.log('[Server] Parsed JSON using regex extraction');
+            } catch (lastAttemptError) {
+              throw lastAttemptError;
+            }
+          } else {
+            throw innerParseError;
+          }
+        }
         
         // Transform the response to match expected format
         studyMaterials = {
@@ -1483,3 +1654,109 @@ app.listen(PORT, HOST, () => {
   console.log(`Server running on http://localhost:${PORT}`)
   console.log(`For mobile access use: http://<your-local-ip>:${PORT}`)
 })
+
+// Helper function to create intelligent content chunks
+function getIntelligentChunks(text) {
+  if (text.length <= 4000) return [text];
+  
+  // Split by paragraphs or sections
+  const paragraphs = text.split(/\n\n+/);
+  const totalParagraphs = paragraphs.length;
+  
+  // If very few paragraphs but long content, try sentence splitting
+  if (totalParagraphs < 5 && text.length > 4000) {
+    const sentences = text.split(/(?<=[.!?])\s+/);
+    return chunkArray(sentences.join(' '), 3);
+  }
+  
+  // Calculate number of chunks based on content length
+  const numChunks = Math.ceil(text.length / 3500);
+  const paragraphsPerChunk = Math.ceil(totalParagraphs / numChunks);
+  
+  const chunks = [];
+  for (let i = 0; i < totalParagraphs; i += paragraphsPerChunk) {
+    chunks.push(paragraphs.slice(i, i + paragraphsPerChunk).join('\n\n'));
+  }
+  
+  return chunks;
+}
+
+// Helper function to chunk array
+function chunkArray(text, numChunks) {
+  const chunkSize = Math.ceil(text.length / numChunks);
+  const chunks = [];
+  
+  for (let i = 0; i < numChunks; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, text.length);
+    chunks.push(text.substring(start, end));
+  }
+  
+  return chunks;
+}
+
+// Helper function to determine appropriate flashcard count
+function getAppropriateFlashcardCount(complexity, classification) {
+  if (classification.classification === 'LANGUAGE_LEARNING' || 
+      classification.subject_area === 'LANGUAGE_LEARNING') {
+    // For vocabulary content, scale based on complexity
+    return complexity === 'high' ? 25 : complexity === 'medium' ? 20 : 15;
+  } else {
+    // For subject content, scale based on complexity
+    return complexity === 'high' ? 20 : complexity === 'medium' ? 15 : 12;
+  }
+}
+
+// Helper function to determine appropriate quiz count
+function getAppropriateQuizCount(complexity, classification) {
+  return complexity === 'high' ? 15 : complexity === 'medium' ? 10 : 8;
+}
+
+// Helper function for safe JSON parsing with fallback
+async function parseJsonSafely(responseText, defaultValues) {
+  try {
+    // Clean the response text
+    const cleanedResponse = responseText
+      .trim()
+      .replace(/^```json\s*/igm, '')
+      .replace(/^```\s*/igm, '')
+      .replace(/\s*```$/igm, '')
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+      .replace(/^\uFEFF/, '')
+      .replace(/^[^{]*({)/, '$1')
+      .trim();
+    
+    try {
+      return JSON.parse(cleanedResponse);
+    } catch (innerError) {
+      console.error('[Server] Inner JSON parse error:', innerError);
+      
+      // Try regex extraction
+      const regex = /{[\s\S]*}/g;
+      const jsonMatch = cleanedResponse.match(regex);
+      if (jsonMatch && jsonMatch.length > 0) {
+        const bestMatch = jsonMatch.reduce((a, b) => a.length > b.length ? a : b);
+        return JSON.parse(bestMatch);
+      }
+      
+      throw innerError;
+    }
+  } catch (error) {
+    console.error('[Server] Failed to parse JSON response:', error);
+    return defaultValues;
+  }
+}
+
+// Add this helper function to determine appropriate card count
+function getAppropriateCardCount(complexity, classification) {
+  // Scale card count based on problem complexity
+  // More complex problems need more concept cards to break down
+  switch (complexity) {
+    case 'high':
+      return 6; // Complex problems need more cards to break down
+    case 'medium':
+      return 4; // Medium complexity problems
+    default:
+      return 3; // Simple problems
+  }
+}

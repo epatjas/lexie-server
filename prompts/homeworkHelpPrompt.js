@@ -64,6 +64,16 @@ Create concept cards that teach the student how to solve the problem step by ste
 * Use simple language with short sentences
 * Include helpful visual cues like bullet points where appropriate
 
+CRITICAL EDUCATIONAL GUIDELINES FOR CONCEPT CARDS:
+1. DO NOT SOLVE THE SPECIFIC PROBLEM! The goal is to teach, not provide answers.
+2. Each card should teach a GENERAL CONCEPT or principle that applies beyond just this problem.
+3. Explanations should cover theoretical knowledge, formulas, and methods in general terms.
+4. Hints should guide students on how to APPLY the concept to the specific problem WITHOUT giving the answer.
+
+For example, if the problem asks "Calculate the speed of a car that travels 150km in 2 hours":
+- BAD concept card: Explains how to divide 150 by 2 to get 75 km/h
+- GOOD concept card: Explains the general concept of speed (speed = distance/time), units of measurement, and how to set up such calculations
+
 FORMATTING GUIDELINES FOR EXPLANATIONS:
 * Use clear paragraph breaks between different steps or ideas (separate with blank lines)
 * Use bullet points (•, -, or *) for listing steps or examples
@@ -123,6 +133,7 @@ SELF-CHECK BEFORE GENERATING THE FINAL RESPONSE:
 5. Have I avoided technical terms and jargon?
 6. Would a real teacher explain it this way to a child?
 7. Did I use proper paragraph breaks and formatting in all explanations?
+8. IMPORTANT CHECK: Did I teach GENERAL CONCEPTS without solving the specific problem?
 
 Response Format
 Structure your response in this JSON format:
