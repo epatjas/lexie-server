@@ -26,15 +26,18 @@ TEXTBOOK_MATERIAL characteristics (classify this way if MAJORITY applies):
 - Content has a structured flow of information building on previous concepts
 - If exercises exist, they serve to reinforce the material just taught
 
-## SUBJECT AREA RECOGNITION
+## SUBJECT AREA RECOGNITION - CRITICAL DISTINCTIONS
 Determine which primary subject area the content belongs to:
 
-1. **LANGUAGE LEARNING** - Content showing these elements:
-   - Vocabulary lists or translations
-   - Grammar rules or patterns
-   - Practice dialogues or texts
-   - Language acquisition exercises
-   - Pronunciation guides
+1. **LANGUAGE_LEARNING** - ONLY classify content as LANGUAGE_LEARNING if ALL of these are true:
+   - The PRIMARY PURPOSE is explicitly teaching a foreign language to Finnish students
+   - Content MUST contain explicit language teaching elements like vocabulary lists with translations
+   - Examples include English textbooks for Finnish students, Swedish vocabulary lists, etc.
+   
+   DO NOT classify content as LANGUAGE_LEARNING if:
+   - Content is in Finnish discussing any academic subject (even if it contains some foreign terms)
+   - Content is about a topic like "participation in school" but happens to be in Finnish
+   - Content mentions foreign words but doesn't focus on teaching a language
 
 2. **MATHEMATICS** - Content showing these elements:
    - Formulas and equations
@@ -44,25 +47,30 @@ Determine which primary subject area the content belongs to:
    - Numerical operations
 
 3. **SCIENCE** - Content showing these elements:
-   - Concepts and definitions
+   - Scientific concepts and definitions
    - Processes and relationships
    - Experimental methods
    - Diagrams and classifications
    - Natural or physical phenomena
 
-4. **READING & LITERATURE** - Content showing these elements:
-   - Stories or passages
-   - Literary elements
-   - Comprehension questions
+4. **READING & LITERATURE** - Content showing literary analysis and reading comprehension in the student's native language:
+   - Analysis of stories, poems, or passages
+   - Literary elements and techniques
+   - Comprehension questions about themes and meanings
    - Character/plot analysis
-   - Text interpretation
+   - Text interpretation and critical reading
+   - NOTE: Content primarily teaching a foreign language through stories is LANGUAGE_LEARNING, not READING_LITERATURE
 
-5. **ARTS & HUMANITIES** - Content showing these elements:
-   - Historical events/timelines
-   - Cultural concepts
-   - Interpretative frameworks
-   - Creative techniques
-   - Social studies content
+5. **ARTS & HUMANITIES** - Content focused on:
+   - Social studies, citizenship, or civic participation
+   - Historical events and cultural topics
+   - Ethics, philosophy, or values
+   - Geography, social institutions or human societies
+   - NOTE: Content in Finnish about these topics is NOT language learning
+
+IMPORTANT DISTINCTION FOR FINNISH STUDENTS:
+- If content is teaching English, Swedish, or any other foreign language to Finnish students, classify as LANGUAGE_LEARNING
+- If content contains foreign language elements but its primary purpose is teaching another subject (e.g., geography terms in English), classify according to the primary subject (e.g., ARTS & HUMANITIES)
 
 EXAMPLES of TEXTBOOK_MATERIAL with exercises:
 - A biology chapter explaining cell structure with a few questions at the end
@@ -83,11 +91,11 @@ SPECIAL CASE FOR VOCABULARY LISTS:
 
 Your response must be EXACTLY this JSON structure with NO additional text:
 {
-  "classification": "PROBLEM_ASSIGNMENT",
-  "confidence": "HIGH",
+  "classification": "PROBLEM_ASSIGNMENT|TEXTBOOK_MATERIAL",
+  "confidence": "HIGH|MEDIUM|LOW",
   "subject_area": "LANGUAGE_LEARNING|MATHEMATICS|SCIENCE|READING_LITERATURE|ARTS_HUMANITIES",
-  "language": "English",
-  "processing_approach": "Problem Assistance"
+  "language": "English|Finnish|Swedish|etc.",
+  "processing_approach": "Problem Assistance|Comprehensive Learning"
 }
 
 IMPORTANT:
