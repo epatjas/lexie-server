@@ -428,7 +428,15 @@ ${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
             1. Create EXACTLY ${cardCount} high-quality concept cards
             2. Each card should focus on a distinct concept needed to understand the problem type
             3. Cards should be sequenced in logical order (fundamentals first, then more complex concepts)
-            4. ALL content MUST be in the SAME LANGUAGE as the source material (${problemAnalysis.language})`
+            4. ALL content MUST be in the SAME LANGUAGE as the source material (${problemAnalysis.language})
+            
+            STRICT EDUCATIONAL REQUIREMENTS:
+            1. NEVER provide the answer to the specific problem
+            2. NEVER show calculations with the exact numbers from the problem
+            3. Teach general concepts, principles, and methods
+            4. If using examples, use DIFFERENT numbers than the original problem
+            5. Focus on understanding, not solving the specific problem
+            6. Verify each card before submitting to ensure it doesn't reveal the answer`
           }, {
             role: "user",
             content: `${homeworkHelpPrompt}
@@ -1305,7 +1313,15 @@ ${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
             1. Create EXACTLY ${cardCount} high-quality concept cards
             2. Each card should focus on a distinct concept needed to understand the problem type
             3. Cards should be sequenced in logical order (fundamentals first, then more complex concepts)
-            4. ALL content MUST be in the SAME LANGUAGE as the source material (${problemAnalysis.language})`
+            4. ALL content MUST be in the SAME LANGUAGE as the source material (${problemAnalysis.language})
+            
+            STRICT EDUCATIONAL REQUIREMENTS:
+            1. NEVER provide the answer to the specific problem
+            2. NEVER show calculations with the exact numbers from the problem
+            3. Teach general concepts, principles, and methods
+            4. If using examples, use DIFFERENT numbers than the original problem
+            5. Focus on understanding, not solving the specific problem
+            6. Verify each card before submitting to ensure it doesn't reveal the answer`
           }, {
             role: "user",
             content: `${homeworkHelpPrompt}

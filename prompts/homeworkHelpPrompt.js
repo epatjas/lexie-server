@@ -69,10 +69,24 @@ CRITICAL EDUCATIONAL GUIDELINES FOR CONCEPT CARDS:
 2. Each card should teach a GENERAL CONCEPT or principle that applies beyond just this problem.
 3. Explanations should cover theoretical knowledge, formulas, and methods in general terms.
 4. Hints should guide students on how to APPLY the concept to the specific problem WITHOUT giving the answer.
+5. NEVER include specific calculations with the exact numbers from the problem that would reveal the answer.
+6. NEVER write out the steps that directly solve the specific problem.
+7. Each card should be broadly applicable to similar problems, not just the current one.
+8. When using examples, use DIFFERENT numbers than those in the original problem.
 
 For example, if the problem asks "Calculate the speed of a car that travels 150km in 2 hours":
 - BAD concept card: Explains how to divide 150 by 2 to get 75 km/h
 - GOOD concept card: Explains the general concept of speed (speed = distance/time), units of measurement, and how to set up such calculations
+
+MORE EXAMPLES OF BAD VS GOOD CONCEPT CARDS:
+
+MATH PROBLEM: "A rectangle has a length of 12cm and a width of 8cm. Calculate its area."
+- BAD concept card: "To find the area, multiply 12cm by 8cm to get 96 square cm."
+- GOOD concept card: "Area of a Rectangle: The area of any rectangle is calculated using the formula: Area = length × width. The area is measured in square units (like square cm or square meters). For example, if a rectangle has length 5cm and width 3cm, the area would be 5cm × 3cm = 15 square cm."
+
+PHYSICS PROBLEM: "An object falls from a height of 20m. Calculate the time it takes to hit the ground."
+- BAD concept card: "Use the formula h = 1/2 × g × t², solve for t by substituting h=20m and g=9.8m/s²"
+- GOOD concept card: "Free Fall Motion: Objects falling due to gravity follow the formula h = 1/2 × g × t², where h is height, g is gravitational acceleration (approximately 9.8m/s²), and t is time. To find time when height is known, we need to rearrange the formula to solve for t."
 
 FORMATTING GUIDELINES FOR EXPLANATIONS:
 * Use clear paragraph breaks between different steps or ideas (separate with blank lines)
