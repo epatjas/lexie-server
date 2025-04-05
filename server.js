@@ -1798,6 +1798,41 @@ ${contentContext.homeworkHelp.concept_cards.map(card => `- ${card.title}: ${card
   }
 });
 
+// Add this endpoint after your existing endpoints
+// This should be added before the app.listen() line
+app.post('/client-logs', (req, res) => {
+  try {
+    // Log with timestamp and clear formatting
+    const timestamp = new Date().toISOString();
+    
+    // Extract info from request
+    const device = req.body.device || 'unknown device';
+    const message = req.body.message || 'No message';
+    const data = req.body.data;
+    
+    // Improved, more visible logging format
+    console.log(`\n[${timestamp}] 📱 CLIENT LOG BEGIN 📱`);
+    console.log(`[${timestamp}] 📱 DEVICE: ${device}`);
+    console.log(`[${timestamp}] 📱 MESSAGE: ${message}`);
+    
+    if (data) {
+      // Pretty-print data objects for better readability
+      console.log(`[${timestamp}] 📱 DATA:`, typeof data === 'object' ? 
+        JSON.stringify(data, null, 2) : data);
+    }
+    
+    console.log(`[${timestamp}] 📱 CLIENT LOG END 📱`);
+    console.log(`${'='.repeat(50)}`);
+    
+    // Send back a success response
+    res.status(200).json({ success: true });
+  } catch (error) {
+    // Handle any errors during logging
+    console.error(`[${new Date().toISOString()}] Error in client-logs endpoint:`, error);
+    res.status(500).json({ success: false, error: 'Failed to process log' });
+  }
+});
+
 // Start the server
 app.listen(PORT, HOST, () => {
   console.log(`Server running on http://localhost:${PORT}`)
@@ -1999,3 +2034,23 @@ function generateGenericQuestions(subjectArea, title, count) {
   
   return questions;
 }
+
+// Add a test endpoint that verifies key functionality
+app.get('/test-health', (req, res) => {
+  try {
+    // Check OpenAI connectivity
+    const aiStatus = openai.apiKey ? 'configured' : 'not configured';
+    
+    // Check database or other dependencies
+    // ...
+    
+    res.json({ 
+      status: 'healthy', 
+      aiService: aiStatus, 
+      memory: process.memoryUsage(),
+      uptime: process.uptime()
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'unhealthy', error: error.message });
+  }
+});
