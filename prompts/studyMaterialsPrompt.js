@@ -79,12 +79,22 @@ ${subjectArea === "LANGUAGE_LEARNING" ?
 :
 `Since this is ${subjectArea} content, you MUST create concept explanation cards:
 * Content is in ${language} about ${subjectArea.replace(/_/g, ' ').toLowerCase()}
-* Front: Key term or concept from the material
-* Back: Definition or explanation of that concept
+
+Structure:
+* Front: Concept, term, problem, or relationship that requires active recall
+* Back: Clear explanation, solution, or definition that builds understanding
+
+Guidelines:
+* Focus on understanding connections and processes, not just facts
+* Progress from basic to complex concepts
+* Connect abstract ideas to practical applications
 * NEVER translate terms to other languages
 * NEVER create vocabulary translation cards
-* Example: {"front": "Aktiivinen kansalaisuus", "back": "Yksilön osallistuminen yhteiskunnalliseen toimintaan ja päätöksentekoon aktiivisesti ja vastuullisesti."}
-* Example: {"front": "Demokratia", "back": "Hallintojärjestelmä, jossa valta on kansalla ja päätöksiä tehdään enemmistöperiaatteella."}`}
+
+Examples:
+* Example: {"front": "Mikä aiheuttaa vuodenajat maapallolla?", "back": "Maapallon akselin kallistuminen sen kiertäessä aurinkoa. Kallistuminen aiheuttaa sen, että eri pallonpuoliskot saavat vaihtelevan määrän suoraa auringonvaloa vuoden mittaan."}
+* Example: {"front": "Miten muunnat 2,5 kg grammoiksi?", "back": "Kerrotaan tuhannella: 2,5 kg = 2 500 g"}
+* Example: {"front": "Mitkä ovat fotosynteesin vaiheet?", "back": "1. Valoenergia muuttuu kemialliseksi energiaksi, 2. Hiilidioksidi ja vesi muuttuvat sokeriksi ja hapeksi, 3. Happi vapautuu ilmakehään ja sokeri varastoituu kasviin."}`}
 
 ===== FINAL VERIFICATION =====
 
