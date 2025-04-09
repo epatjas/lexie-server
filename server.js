@@ -402,6 +402,14 @@ ${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
         language: classification.language || 'en'
       });
 
+      // After parsing problem analysis, add this standardization step
+      if (problemAnalysis && problemAnalysis.approach_guidance !== undefined) {
+        // Standardize to array format if it's a string
+        if (!Array.isArray(problemAnalysis.approach_guidance)) {
+          problemAnalysis.approach_guidance = [problemAnalysis.approach_guidance];
+        }
+      }
+
       // 4. SECOND CALL: Get concept cards
       const cardCount = getAppropriateCardCount(contentComplexity, classification);
       console.log(`[${new Date().toISOString()}] Generating ${cardCount} concept cards based on problem complexity`);
@@ -492,11 +500,23 @@ ${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`,
           console.log(`[${new Date().toISOString()}] Sample approach guidance: "${problemAnalysis.approach_guidance}"`);
           
           // Check if guidance contains "englannin sana" or similar translation indicator
-          const nonVocabGuidance = problemAnalysis.approach_guidance.filter(g => 
-            !g.toLowerCase().includes("englannin") && 
-            !g.toLowerCase().includes("sana") &&
-            !g.toLowerCase().includes("käännös")
-          );
+          let nonVocabGuidance = [];
+          if (problemAnalysis.approach_guidance) {
+            if (Array.isArray(problemAnalysis.approach_guidance)) {
+              // Handle array case - original code
+              nonVocabGuidance = problemAnalysis.approach_guidance.filter(g => 
+                !g.toLowerCase().includes("englannin") && 
+                !g.toLowerCase().includes("sana") &&
+                !g.toLowerCase().includes("käännös")
+              );
+            } else if (typeof problemAnalysis.approach_guidance === 'string') {
+              // Handle string case - check if it contains any of the keywords
+              const guidance = problemAnalysis.approach_guidance.toLowerCase();
+              if (!guidance.includes("englannin") && !guidance.includes("sana") && !guidance.includes("käännös")) {
+                nonVocabGuidance = [problemAnalysis.approach_guidance];
+              }
+            }
+          }
           
           if (nonVocabGuidance.length > 0) {
             console.log(`[${new Date().toISOString()}] Warning: Approach guidance appears to be a translation`);
@@ -1286,6 +1306,14 @@ ${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
         approach_guidance: '',
         language: classification.language || 'en'
       });
+
+      // After parsing problem analysis, add this standardization step
+      if (problemAnalysis && problemAnalysis.approach_guidance !== undefined) {
+        // Standardize to array format if it's a string
+        if (!Array.isArray(problemAnalysis.approach_guidance)) {
+          problemAnalysis.approach_guidance = [problemAnalysis.approach_guidance];
+        }
+      }
 
       // 4. SECOND CALL: Get concept cards
       const cardCount = getAppropriateCardCount(contentComplexity, classification);
