@@ -356,30 +356,25 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: `You are an AI that helps with homework problems. Generate ONLY the basic problem analysis.
-            Your response must be valid JSON with ONLY these fields:
-            {
-              "title": "Brief title describing the problem",
-              "problem_summary": "Detailed explanation of the problem",
-              "problem_type": "MATH|PHYSICS|CHEMISTRY|BIOLOGY|HISTORY|OTHER",
-              "approach_guidance": "General guidance on how to approach this problem",
-              "language": "en|fi"
-            }
-            
-            IMPORTANT: Since this problem is ${contentComplexity} complexity (${contentLength} characters):
-            1. Create a ${contentComplexity === 'high' ? 'very detailed' : contentComplexity === 'medium' ? 'moderately detailed' : 'concise'} problem summary
-            2. The language field should reflect the language of the problem (${classification.language})
-            3. Use proper markdown formatting where appropriate`
+            content: homeworkHelpPrompt
           }, {
             role: "user",
-            content: `${homeworkHelpPrompt}
-
-IMPORTANT OVERRIDE: Generate ONLY the problem analysis fields listed above.
-Do not generate concept cards in this response.
-
+            content: `Content to analyze:
 Problem Type: ${classification.subject_area}
+Content Complexity: ${contentComplexity}
+Content Length: ${contentLength} characters
+
 Homework Content:
-${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
+${contentChunks.join("\n\n===SECTION BREAK===\n\n")}
+
+IMPORTANT: Generate ONLY the problem analysis JSON with these fields:
+{
+  "title": "Brief title describing the problem",
+  "problem_summary": "Detailed explanation of the problem",
+  "problem_type": "MATH|PHYSICS|CHEMISTRY|BIOLOGY|HISTORY|OTHER",
+  "approach_guidance": "General guidance on how to approach this problem",
+  "language": "en|fi"
+}`
           }],
           max_tokens: 2048,
           stream: true
@@ -419,45 +414,30 @@ ${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: `You are an AI that creates educational concept cards for homework problems. Generate ONLY the concept_cards array.
-            Your response must be valid JSON with ONLY this field:
-            {
-              "concept_cards": [
-                {
-                  "card_number": 1,
-                  "title": "Concept title",
-                  "explanation": "Detailed explanation of the concept",
-                  "hint": "Hint to apply this concept to the problem"
-                }
-              ]
-            }
-            
-            QUALITY REQUIREMENTS:
-            1. Create EXACTLY ${cardCount} high-quality concept cards
-            2. Each card should focus on a distinct concept needed to understand the problem type
-            3. Cards should be sequenced in logical order (fundamentals first, then more complex concepts)
-            4. ALL content MUST be in the SAME LANGUAGE as the source material (${problemAnalysis.language})
-            
-            STRICT EDUCATIONAL REQUIREMENTS:
-            1. NEVER provide the answer to the specific problem
-            2. NEVER show calculations with the exact numbers from the problem
-            3. Teach general concepts, principles, and methods
-            4. If using examples, use DIFFERENT numbers than the original problem
-            5. Focus on understanding, not solving the specific problem
-            6. Verify each card before submitting to ensure it doesn't reveal the answer`
+            content: homeworkHelpPrompt
           }, {
             role: "user",
-            content: `${homeworkHelpPrompt}
-
-IMPORTANT OVERRIDE: Generate ONLY concept cards following the guidelines in the homeworkHelpPrompt.
-Focus exclusively on creating ${cardCount} high-quality concept cards.
-
+            content: `Content to analyze:
 Problem Title: ${problemAnalysis.title}
 Problem Summary: ${problemAnalysis.problem_summary}
 Approach Guidance: ${problemAnalysis.approach_guidance}
+Content Complexity: ${contentComplexity}
+Number of Cards to Generate: ${cardCount}
 
 Problem Content:
-${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`,
+${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}
+
+IMPORTANT: Generate ONLY the concept cards JSON with this field:
+{
+  "concept_cards": [
+    {
+      "card_number": 1,
+      "title": "Title focusing on the help it provides",
+      "explanation": "Brief explanation with SPECIFIC EXAMPLES from the problem",
+      "hint": "Actionable guidance using a CONCRETE part of the problem"
+    }
+  ]
+}`
           }],
           max_tokens: 4096,
           stream: true
@@ -1261,30 +1241,25 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: `You are an AI that helps with homework problems. Generate ONLY the basic problem analysis.
-            Your response must be valid JSON with ONLY these fields:
-            {
-              "title": "Brief title describing the problem",
-              "problem_summary": "Detailed explanation of the problem",
-              "problem_type": "MATH|PHYSICS|CHEMISTRY|BIOLOGY|HISTORY|OTHER",
-              "approach_guidance": "General guidance on how to approach this problem",
-              "language": "en|fi"
-            }
-            
-            IMPORTANT: Since this problem is ${contentComplexity} complexity (${contentLength} characters):
-            1. Create a ${contentComplexity === 'high' ? 'very detailed' : contentComplexity === 'medium' ? 'moderately detailed' : 'concise'} problem summary
-            2. The language field should reflect the language of the problem (${classification.language})
-            3. Use proper markdown formatting where appropriate`
+            content: homeworkHelpPrompt
           }, {
             role: "user",
-            content: `${homeworkHelpPrompt}
-
-IMPORTANT OVERRIDE: Generate ONLY the problem analysis fields listed above.
-Do not generate concept cards in this response.
-
+            content: `Content to analyze:
 Problem Type: ${classification.subject_area}
+Content Complexity: ${contentComplexity}
+Content Length: ${contentLength} characters
+
 Homework Content:
-${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
+${contentChunks.join("\n\n===SECTION BREAK===\n\n")}
+
+IMPORTANT: Generate ONLY the problem analysis JSON with these fields:
+{
+  "title": "Brief title describing the problem",
+  "problem_summary": "Detailed explanation of the problem",
+  "problem_type": "MATH|PHYSICS|CHEMISTRY|BIOLOGY|HISTORY|OTHER",
+  "approach_guidance": "General guidance on how to approach this problem",
+  "language": "en|fi"
+}`
           }],
           max_tokens: 2048,
           stream: true
@@ -1324,45 +1299,30 @@ ${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`,
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: `You are an AI that creates educational concept cards for homework problems. Generate ONLY the concept_cards array.
-            Your response must be valid JSON with ONLY this field:
-            {
-              "concept_cards": [
-                {
-                  "card_number": 1,
-                  "title": "Concept title",
-                  "explanation": "Detailed explanation of the concept",
-                  "hint": "Hint to apply this concept to the problem"
-                }
-              ]
-            }
-            
-            QUALITY REQUIREMENTS:
-            1. Create EXACTLY ${cardCount} high-quality concept cards
-            2. Each card should focus on a distinct concept needed to understand the problem type
-            3. Cards should be sequenced in logical order (fundamentals first, then more complex concepts)
-            4. ALL content MUST be in the SAME LANGUAGE as the source material (${problemAnalysis.language})
-            
-            STRICT EDUCATIONAL REQUIREMENTS:
-            1. NEVER provide the answer to the specific problem
-            2. NEVER show calculations with the exact numbers from the problem
-            3. Teach general concepts, principles, and methods
-            4. If using examples, use DIFFERENT numbers than the original problem
-            5. Focus on understanding, not solving the specific problem
-            6. Verify each card before submitting to ensure it doesn't reveal the answer`
+            content: homeworkHelpPrompt
           }, {
             role: "user",
-            content: `${homeworkHelpPrompt}
-
-IMPORTANT OVERRIDE: Generate ONLY concept cards following the guidelines in the homeworkHelpPrompt.
-Focus exclusively on creating ${cardCount} high-quality concept cards.
-
+            content: `Content to analyze:
 Problem Title: ${problemAnalysis.title}
 Problem Summary: ${problemAnalysis.problem_summary}
 Approach Guidance: ${problemAnalysis.approach_guidance}
+Content Complexity: ${contentComplexity}
+Number of Cards to Generate: ${cardCount}
 
 Problem Content:
-${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`,
+${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}
+
+IMPORTANT: Generate ONLY the concept cards JSON with this field:
+{
+  "concept_cards": [
+    {
+      "card_number": 1,
+      "title": "Title focusing on the help it provides",
+      "explanation": "Brief explanation with SPECIFIC EXAMPLES from the problem",
+      "hint": "Actionable guidance using a CONCRETE part of the problem"
+    }
+  ]
+}`
           }],
           max_tokens: 4096,
           stream: true
