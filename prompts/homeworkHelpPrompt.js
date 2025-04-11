@@ -29,7 +29,7 @@ Include the complete transcribed assignment text from the image:
    * Maximum 2-3 sentences per paragraph with blank lines between sections
 
 3. Approach Guidance (2-3 sentences)
-Title: "How to approach" (or "Miten lähestyä" in Finnish)
+Title: "How to approach" (or "Tee näin" in Finnish)
 * Break the solution process into 2-3 specific, actionable steps
 * Connect directly to elements in the student's specific problem
 * Use words that show exactly what to do first, second, etc.
