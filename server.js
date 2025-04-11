@@ -356,25 +356,15 @@ app.post('/analyze', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: homeworkHelpPrompt
+            content: homeworkHelpPrompt.problemAnalysisPrompt(
+              contentComplexity,
+              contentLength,
+              classification.language,
+              classification.subject_area
+            )
           }, {
             role: "user",
-            content: `Content to analyze:
-Problem Type: ${classification.subject_area}
-Content Complexity: ${contentComplexity}
-Content Length: ${contentLength} characters
-
-Homework Content:
-${contentChunks.join("\n\n===SECTION BREAK===\n\n")}
-
-IMPORTANT: Generate ONLY the problem analysis JSON with these fields:
-{
-  "title": "Brief title describing the problem",
-  "problem_summary": "Detailed explanation of the problem",
-  "problem_type": "MATH|PHYSICS|CHEMISTRY|BIOLOGY|HISTORY|OTHER",
-  "approach_guidance": "General guidance on how to approach this problem",
-  "language": "en|fi"
-}`
+            content: `Homework Content:\n${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`
           }],
           max_tokens: 2048,
           stream: true
@@ -414,30 +404,15 @@ IMPORTANT: Generate ONLY the problem analysis JSON with these fields:
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: homeworkHelpPrompt
+            content: homeworkHelpPrompt.conceptCardsPrompt(
+              cardCount,
+              problemAnalysis.language,
+              problemAnalysis.title,
+              problemAnalysis.problem_type
+            )
           }, {
             role: "user",
-            content: `Content to analyze:
-Problem Title: ${problemAnalysis.title}
-Problem Summary: ${problemAnalysis.problem_summary}
-Approach Guidance: ${problemAnalysis.approach_guidance}
-Content Complexity: ${contentComplexity}
-Number of Cards to Generate: ${cardCount}
-
-Problem Content:
-${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}
-
-IMPORTANT: Generate ONLY the concept cards JSON with this field:
-{
-  "concept_cards": [
-    {
-      "card_number": 1,
-      "title": "Title focusing on the help it provides",
-      "explanation": "Brief explanation with SPECIFIC EXAMPLES from the problem",
-      "hint": "Actionable guidance using a CONCRETE part of the problem"
-    }
-  ]
-}`
+            content: `Problem Content:\n${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`
           }],
           max_tokens: 4096,
           stream: true
@@ -1241,25 +1216,15 @@ app.post('/homework-help', validateAnalyzeRequest, async (req, res) => {
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: homeworkHelpPrompt
+            content: homeworkHelpPrompt.problemAnalysisPrompt(
+              contentComplexity,
+              contentLength,
+              classification.language,
+              classification.subject_area
+            )
           }, {
             role: "user",
-            content: `Content to analyze:
-Problem Type: ${classification.subject_area}
-Content Complexity: ${contentComplexity}
-Content Length: ${contentLength} characters
-
-Homework Content:
-${contentChunks.join("\n\n===SECTION BREAK===\n\n")}
-
-IMPORTANT: Generate ONLY the problem analysis JSON with these fields:
-{
-  "title": "Brief title describing the problem",
-  "problem_summary": "Detailed explanation of the problem",
-  "problem_type": "MATH|PHYSICS|CHEMISTRY|BIOLOGY|HISTORY|OTHER",
-  "approach_guidance": "General guidance on how to approach this problem",
-  "language": "en|fi"
-}`
+            content: `Homework Content:\n${contentChunks.join("\n\n===SECTION BREAK===\n\n")}`
           }],
           max_tokens: 2048,
           stream: true
@@ -1299,30 +1264,15 @@ IMPORTANT: Generate ONLY the problem analysis JSON with these fields:
           model: "gpt-4o",
           messages: [{
             role: "system",
-            content: homeworkHelpPrompt
+            content: homeworkHelpPrompt.conceptCardsPrompt(
+              cardCount,
+              problemAnalysis.language,
+              problemAnalysis.title,
+              problemAnalysis.problem_type
+            )
           }, {
             role: "user",
-            content: `Content to analyze:
-Problem Title: ${problemAnalysis.title}
-Problem Summary: ${problemAnalysis.problem_summary}
-Approach Guidance: ${problemAnalysis.approach_guidance}
-Content Complexity: ${contentComplexity}
-Number of Cards to Generate: ${cardCount}
-
-Problem Content:
-${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}
-
-IMPORTANT: Generate ONLY the concept cards JSON with this field:
-{
-  "concept_cards": [
-    {
-      "card_number": 1,
-      "title": "Title focusing on the help it provides",
-      "explanation": "Brief explanation with SPECIFIC EXAMPLES from the problem",
-      "hint": "Actionable guidance using a CONCRETE part of the problem"
-    }
-  ]
-}`
+            content: `Problem Content:\n${contentChunks.join("\n\n===SECTION BREAK===\n\n").substring(0, 6000)}`
           }],
           max_tokens: 4096,
           stream: true
